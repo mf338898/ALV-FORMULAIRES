@@ -18,7 +18,9 @@
     "force-clean": "pkill -f 'next dev' && ./maintenance-cache.sh && npm run dev",
     "export": "next build",
     "deploy": "npm run build && gh-pages -d out",
-    "predeploy": "npm run build"
+    "predeploy": "npm run build",
+    "build:static": "NODE_ENV=production next build",
+    "deploy:gh-pages": "npm run build:static && gh-pages -d out --dotfiles"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

@@ -1,8 +1,20 @@
-import { NextResponse } from "next/server"
-import { smtpDiagnostics } from "@/lib/mail"
+export const dynamic = 'force-static'
+export const revalidate = false
 
 export async function GET() {
-  const diag = await smtpDiagnostics()
-  // Never include secrets in the response
-  return NextResponse.json(diag)
+  return new Response('API non disponible en mode statique', {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+  })
+}
+
+export async function POST() {
+  return new Response('API non disponible en mode statique', {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/plain',
+    },
+  })
 }

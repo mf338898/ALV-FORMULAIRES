@@ -1,0 +1,10 @@
+# Exclure les routes API du build statique
+app/api/
+# Exclure les fichiers de développement
+.env.local
+.env.development
+# Exclure les fichiers de cache
+.next/
+node_modules/
+# Exclure les fichiers de logs
+*.log 

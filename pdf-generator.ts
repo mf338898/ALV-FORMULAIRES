@@ -135,7 +135,7 @@ async function generatePdfV2(
   /* -----------------------------------------------------------------
        LOGO : on tente d’embarquer /public/images/logo.png (optionnel)
     ------------------------------------------------------------------*/
-  let logoImg: undefined | ReturnType<(typeof pdfDoc)["embedPng"]> = undefined
+  let logoImg: any = undefined
   try {
     const logoPath = path.join(process.cwd(), "public", "images", "logo.png")
     if (fs.existsSync(logoPath)) {

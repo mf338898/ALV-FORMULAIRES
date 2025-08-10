@@ -6,14 +6,19 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
-  // Désactiver les fonctionnalités incompatibles avec l'export statique
+  // Exclure les routes API du build statique
+  experimental: {
+    appDir: true
+  },
+  // Configuration pour l'export statique
+  distDir: 'out',
+  // Désactiver les fonctionnalités incompatibles
   typescript: {
     ignoreBuildErrors: true
   },
   eslint: {
     ignoreDuringBuilds: true
-  },
-  // Configuration pour l'export statique
+  }
 };
 
 export default nextConfig;
