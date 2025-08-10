@@ -42,11 +42,19 @@ import {
   Circle,
   ListIcon,
   Trash2,
+  User,
+  Briefcase,
+  Baby,
+  Shield,
+  Search,
+  FolderOpen,
+  ClipboardCheck,
 } from "lucide-react"
 
 import { DatePicker } from "@/components/date-picker"
 import type { Locataire, CriteresRecherche, Garanties, RevenuAdditionnel } from "@/lib/types"
 import { SegmentedProgress, type SegmentedStep, CircularStepIndicator } from "@/components/segmented-progress"
+import { StepNavigation } from "@/components/step-navigation"
 
 const createLocataireVide = (): Locataire => ({
   nom: "",
@@ -85,6 +93,120 @@ const createLocataireVide = (): Locataire => ({
   origineRevenuPrincipalAutre: "",
 })
 
+// Fonction temporaire avec des données de test pour faciliter les tests
+const createLocataireTest = (): Locataire => ({
+  nom: "Dupont",
+  prenom: "Marie",
+  civilite: "femme",
+  situationConjugale: "celibataire",
+  adresseActuelle: "123 Rue de la Paix, 75001 Paris",
+  telephone: "0612345678",
+  email: "marie.dupont@email.com",
+  dateNaissance: "1990-05-15",
+  lieuNaissance: "Paris",
+  situationActuelle: "locataire",
+  preavisADeposer: "oui",
+  dureePreavise: "3mois",
+  dureePreaviseAutre: "",
+  hebergeParQui: "",
+  profession: "ingenieur",
+  etablissementFormation: "",
+  employeurNom: "TechCorp SARL",
+  employeurAdresse: "456 Avenue des Champs, 75008 Paris",
+  employeurTelephone: "0145678901",
+  dateEmbauche: "2020-09-01",
+  typeContrat: "cdi",
+  salaire: "4500",
+  revenusAdditionnels: [],
+  dateFinContrat: "",
+  dureeInscriptionInterim: "",
+  agenceInterim: "",
+  dateDebutActivite: "",
+  regimeRetraite: "",
+  dateDebutRetraite: "",
+  alternance: "non",
+  typeAlternance: "",
+  situationActuelleSansEmploi: "",
+  origineRevenuPrincipal: "salaire",
+  origineRevenuPrincipalAutre: "",
+})
+
+// Fonction pour créer le 3ème locataire de test
+const createLocataireTest3 = (): Locataire => ({
+  nom: "Martin",
+  prenom: "Pierre",
+  civilite: "homme",
+  situationConjugale: "marie",
+  adresseActuelle: "789 Boulevard Saint-Germain, 75006 Paris",
+  telephone: "0645678901",
+  email: "pierre.martin@email.com",
+  dateNaissance: "1988-12-03",
+  lieuNaissance: "Lyon",
+  situationActuelle: "locataire",
+  preavisADeposer: "oui",
+  dureePreavise: "2mois",
+  dureePreaviseAutre: "",
+  hebergeParQui: "",
+  profession: "avocat",
+  etablissementFormation: "",
+  employeurNom: "Cabinet Martin & Associés",
+  employeurAdresse: "321 Rue de Rivoli, 75001 Paris",
+  employeurTelephone: "0145678902",
+  dateEmbauche: "2018-03-15",
+  typeContrat: "cdi",
+  salaire: "5200",
+  revenusAdditionnels: [],
+  dateFinContrat: "",
+  dureeInscriptionInterim: "",
+  agenceInterim: "",
+  dateDebutActivite: "",
+  regimeRetraite: "",
+  dateDebutRetraite: "",
+  alternance: "non",
+  typeAlternance: "",
+  situationActuelleSansEmploi: "",
+  origineRevenuPrincipal: "salaire",
+  origineRevenuPrincipalAutre: "",
+})
+
+// Fonction pour créer le 4ème locataire de test
+const createLocataireTest4 = (): Locataire => ({
+  nom: "Dubois",
+  prenom: "Sophie",
+  civilite: "femme",
+  situationConjugale: "divorcee",
+  adresseActuelle: "456 Avenue Montaigne, 75008 Paris",
+  telephone: "0678901234",
+  email: "sophie.dubois@email.com",
+  dateNaissance: "1992-08-22",
+  lieuNaissance: "Marseille",
+  situationActuelle: "locataire",
+  preavisADeposer: "oui",
+  dureePreavise: "1mois",
+  dureePreaviseAutre: "",
+  hebergeParQui: "",
+  profession: "medecin",
+  etablissementFormation: "",
+  employeurNom: "Centre Médical Saint-Lazare",
+  employeurAdresse: "654 Rue du Faubourg Saint-Honoré, 75008 Paris",
+  employeurTelephone: "0145678903",
+  dateEmbauche: "2021-11-01",
+  typeContrat: "cdd",
+  salaire: "3800",
+  revenusAdditionnels: [],
+  dateFinContrat: "2025-06-30",
+  dureeInscriptionInterim: "",
+  agenceInterim: "",
+  dateDebutActivite: "",
+  regimeRetraite: "",
+  dateDebutRetraite: "",
+  alternance: "non",
+  typeAlternance: "",
+  situationActuelleSansEmploi: "",
+  origineRevenuPrincipal: "salaire",
+  origineRevenuPrincipalAutre: "",
+})
+
 const criteresVides: CriteresRecherche = {
   nombreChambres: "",
   secteurSouhaite: "",
@@ -96,11 +218,34 @@ const criteresVides: CriteresRecherche = {
   loyerMax: "",
 }
 
+// Données de test pour les critères de recherche
+const criteresTest: CriteresRecherche = {
+  nombreChambres: "2",
+  secteurSouhaite: "centre-ville",
+  rayonKm: "5",
+  dateEmmenagement: "2024-09-01",
+  preavisADeposer: "oui",
+  raisonDemenagement: "changement de travail",
+  informationsComplementaires: "Appartement lumineux avec balcon souhaité",
+  loyerMax: "1200",
+}
+
 const garantiesVides: Garanties = {
   garantFamilial: "non",
   garantieVisale: "non",
   precisionGarant: "",
   garants: [],
+}
+
+// Données de test pour les garanties
+const garantiesTest: Garanties = {
+  garantFamilial: "oui",
+  garantieVisale: "non",
+  precisionGarant: "Parents comme garants familiaux",
+  garants: [
+    { nom: "Dupont", prenom: "Jean", email: "jean.dupont@email.com", telephone: "0623456789" },
+    { nom: "Martin", prenom: "Sophie", email: "sophie.martin@email.com", telephone: "0634567890" }
+  ],
 }
 
 const NumberInput = ({ value, onChange }: { value: number; onChange: (value: number) => void }) => {
@@ -218,7 +363,7 @@ export default function FormulairePage() {
 
   const getEtapeDetails = () => {
     let currentEtape = etape
-    if (currentEtape === 1) return { type: "bien", title: "Informations sur le bien" as const }
+    if (currentEtape === 1) return { type: "bien", title: "Informations sur le bien" }
     currentEtape--
 
     if (currentEtape <= etapesLocataires) {
@@ -226,7 +371,7 @@ export default function FormulairePage() {
       const isIdentite = (currentEtape - 1) % etapesParLocataire === 0
       const locataireIdText = locataires.length > 1 ? ` (Locataire ${locataireIndex + 1})` : ""
       return {
-        type: (isIdentite ? "identite" : "professionnel") as const,
+        type: (isIdentite ? "identite" : "professionnel"),
         title: `${isIdentite ? "Identité & Situation" : "Situation professionnelle"}${locataireIdText}`,
         subtitle: isIdentite
           ? "Toutes les informations sont obligatoires."
@@ -236,36 +381,36 @@ export default function FormulairePage() {
     }
     currentEtape -= etapesLocataires
 
-    if (etapeEnfants && currentEtape === 1) return { type: "enfants" as const, title: "Composition du foyer" }
+    if (etapeEnfants && currentEtape === 1) return { type: "enfants", title: "Composition du foyer" }
     if (etapeEnfants) currentEtape--
 
     if (currentEtape === 1)
       return {
-        type: "garanties" as const,
+        type: "garanties",
         title: "Garanties du dossier",
         subtitle:
           "Facultatif, mais fortement recommandé. Un seul garant ou une seule garantie Visale couvre tous les locataires.",
       }
     currentEtape--
 
-    if (currentEtape === 1) return { type: "recherche" as const, title: "Votre recherche (facultatif)" }
+    if (currentEtape === 1) return { type: "recherche", title: "Votre recherche (facultatif)" }
     currentEtape--
 
     if (currentEtape === 1)
       return {
-        type: "dossierfacile" as const,
+        type: "dossierfacile",
         title: "Gagnez du temps avec DossierFacile (ou vos pièces déjà prêtes)",
       }
     currentEtape--
 
     if (currentEtape === 1)
       return {
-        type: "recapitulatif" as const,
+        type: "recapitulatif",
         title: "Récapitulatif de votre dossier",
         subtitle: "Veuillez vérifier vos informations avant de soumettre.",
       }
 
-    return { type: "unknown" as const, title: "Formulaire" }
+    return { type: "unknown", title: "Formulaire" }
   }
 
   const detailsEtape = getEtapeDetails()
@@ -306,6 +451,35 @@ export default function FormulairePage() {
     if (regex.test(e.target.value)) {
       callback(e.target.value)
     }
+  }
+
+  // Validation en temps réel pour les champs critiques
+  const validateFieldInRealTime = (field: string, value: string, locataireIndex: number) => {
+    const L = locataires[locataireIndex]
+    
+    switch (field) {
+      case 'email':
+        if (value && !isValidEmail(value)) {
+          return "Format d'email invalide"
+        }
+        break
+      case 'telephone':
+        if (value && !isValidPhoneDigits(value, 10)) {
+          return "Le téléphone doit contenir au moins 10 chiffres"
+        }
+        break
+      case 'salaire':
+        if (value && !isNonNegativeIntegerString(value)) {
+          return "Le salaire doit être un nombre positif"
+        }
+        break
+      case 'employeurTelephone':
+        if (value && !isValidPhoneDigits(value, 10)) {
+          return "Le téléphone employeur doit contenir au moins 10 chiffres"
+        }
+        break
+    }
+    return null
   }
 
   const updateLocataire = (index: number, field: keyof Locataire, value: any) => {
@@ -405,9 +579,16 @@ export default function FormulairePage() {
 
   const addGarant = () => {
     if (garanties.garants.length >= 2) return
+    // Ajouter un garant avec des données de test
+    const nouveauGarant = garanties.garants.length === 0 ? {
+      nom: "Dubois",
+      prenom: "Claire",
+      email: "claire.dubois@email.com",
+      telephone: "0656789012"
+    } : { nom: "", prenom: "", email: "", telephone: "" }
     setGaranties((prev) => ({
       ...prev,
-      garants: [...(prev.garants || []), { nom: "", prenom: "", email: "", telephone: "" }],
+      garants: [...(prev.garants || []), nouveauGarant],
     }))
   }
 
@@ -434,7 +615,13 @@ export default function FormulairePage() {
 
   const ajouterRevenuAdditionnel = (indexLocataire: number, typeRevenu: string) => {
     if (!typeRevenu) return
-    const nouveauRevenu: RevenuAdditionnel = { id: Date.now().toString(), type: typeRevenu, montant: "", precision: "" }
+    // Ajouter un revenu avec des données de test
+    const nouveauRevenu: RevenuAdditionnel = { 
+      id: Date.now().toString(), 
+      type: typeRevenu, 
+      montant: typeRevenu === "freelance" ? "800" : typeRevenu === "investissement" ? "300" : "500", 
+      precision: typeRevenu === "freelance" ? "Développement web freelance" : typeRevenu === "investissement" ? "Actions et obligations" : "Location saisonnière" 
+    }
     setLocataires(
       locataires.map((loc, i) => {
         if (i === indexLocataire) {
@@ -736,21 +923,68 @@ export default function FormulairePage() {
       toast.error("Veuillez renseigner la référence du bien.")
       return false
     }
+    
     if (detailsEtape.type === "identite" && typeof detailsEtape.locataireIndex === "number") {
       const li = detailsEtape.locataireIndex
       if (!validateIdentite(li)) {
         setShowIdErrors(true)
         setErrorLocIdx(li)
-        toast.error("Merci de compléter toutes les informations d’identité (champs obligatoires).")
+        
+        // Message d'erreur plus détaillé
+        const L = locataires[li]
+        const missingFields: string[] = []
+        if (isEmpty(L.civilite)) missingFields.push("civilité")
+        if (isEmpty(L.prenom)) missingFields.push("prénom")
+        if (isEmpty(L.nom)) missingFields.push("nom")
+        if (isEmpty(L.email)) missingFields.push("email")
+        if (isEmpty(L.telephone)) missingFields.push("téléphone")
+        if (isEmpty(L.adresseActuelle)) missingFields.push("adresse actuelle")
+        if (isEmpty(L.situationConjugale)) missingFields.push("situation conjugale")
+        if (isEmpty(L.situationActuelle)) missingFields.push("situation actuelle")
+        if (isEmpty(L.dateNaissance)) missingFields.push("date de naissance")
+        if (isEmpty(L.lieuNaissance)) missingFields.push("lieu de naissance")
+        
+        const message = `Champs manquants : ${missingFields.join(", ")}. Veuillez compléter toutes les informations d'identité.`
+        toast.error(message)
         return false
       }
     }
+    
     if (detailsEtape.type === "professionnel" && typeof detailsEtape.locataireIndex === "number") {
       const li = detailsEtape.locataireIndex
       if (!isProfessionnelValid(li)) {
         setShowProErrors(true)
         setErrorLocIdx(li)
-        toast.error("Merci de compléter toutes les informations professionnelles (champs obligatoires).")
+        
+        // Message d'erreur plus détaillé selon le type de contrat
+        const L = locataires[li]
+        const proErrors = getProErrors(li)
+        const missingFields = Object.keys(proErrors).map(key => {
+          switch(key) {
+            case 'employeurNom': return 'nom de l\'employeur'
+            case 'profession': return 'profession'
+            case 'employeurAdresse': return 'adresse de l\'employeur'
+            case 'dateEmbauche': return 'date d\'embauche'
+            case 'dateFinContrat': return 'date de fin de contrat'
+            case 'agenceInterim': return 'agence d\'intérim'
+            case 'dureeInscriptionInterim': return 'durée d\'inscription intérim'
+            case 'regimeRetraite': return 'régime de retraite'
+            case 'dateDebutRetraite': return 'date de début de retraite'
+            case 'etablissementFormation': return 'établissement de formation'
+            case 'alternance': return 'alternance'
+            case 'typeAlternance': return 'type d\'alternance'
+            case 'dateDebutActivite': return 'date de début d\'activité'
+            case 'situationActuelleSansEmploi': return 'situation actuelle'
+            case 'origineRevenuPrincipal': return 'origine du revenu principal'
+            case 'origineRevenuPrincipalAutre': return 'précision origine revenu'
+            case 'salaire': return 'salaire'
+            case 'employeurTelephone': return 'téléphone employeur'
+            default: return key
+          }
+        })
+        
+        const message = `Champs professionnels manquants : ${missingFields.join(", ")}. Veuillez compléter toutes les informations professionnelles.`
+        toast.error(message)
         return false
       }
     }
@@ -766,7 +1000,19 @@ export default function FormulairePage() {
         const allValid = list.every(isGarantValid)
         if (!allValid) {
           setShowGarantErrors(true)
-          toast.error("Les informations du garant sont incomplètes ou invalides.")
+          
+          // Message d'erreur plus détaillé pour les garanties
+          const invalidGarants = list.filter(g => !isGarantValid(g))
+          const missingFields: string[] = []
+          invalidGarants.forEach((g, idx) => {
+            if (isEmpty(g.nom)) missingFields.push(`nom du garant ${idx + 1}`)
+            if (isEmpty(g.prenom)) missingFields.push(`prénom du garant ${idx + 1}`)
+            if (isEmpty(g.email)) missingFields.push(`email du garant ${idx + 1}`)
+            if (isEmpty(g.telephone)) missingFields.push(`téléphone du garant ${idx + 1}`)
+          })
+          
+          const message = `Informations garant manquantes : ${missingFields.join(", ")}. Veuillez compléter tous les champs.`
+          toast.error(message)
           return false
         }
       }
@@ -807,12 +1053,55 @@ export default function FormulairePage() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       {/* Mobile sticky header with circular step indicator */}
-      <div className="md:hidden sticky top-0 z-30 -mt-8 mb-4 bg-white/80 backdrop-blur border-b px-4 py-2">
-        <div className="flex items-center gap-3">
-          <CircularStepIndicator current={etape} total={totalEtapes} />
-          <p className="text-xs text-slate-600">
-            Étape {etape} sur {totalEtapes} : <span className="font-medium text-slate-800">{detailsEtape.title}</span>
-          </p>
+      <div className="md:hidden sticky top-0 z-30 -mt-8 mb-4 bg-white/90 backdrop-blur-md border-b border-slate-200/60 shadow-sm px-4 py-3">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <CircularStepIndicator current={etape} total={totalEtapes} />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+              <span className="text-[8px] text-white font-bold">{etape}</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-800">
+              Étape {etape} sur {totalEtapes}
+            </p>
+            <p className="text-xs text-slate-600">
+              {detailsEtape.title}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main header with title and back button */}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 bg-gradient-to-r from-blue-50 via-white to-indigo-50 rounded-2xl border border-blue-100 shadow-sm">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg">
+                <FileText className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent">
+                  Fiche de renseignement
+                </h1>
+                <p className="text-slate-600 text-sm mt-1">
+                  Formulaire de candidature locataire - ALV Immobilier
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <Button
+            onClick={() => router.push("/")}
+            variant="outline"
+            size="lg"
+            className="group flex items-center gap-3 px-6 py-3 bg-white hover:bg-blue-50 border-blue-200 hover:border-blue-300 text-blue-700 hover:text-blue-800 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+          >
+            <div className="p-1.5 bg-blue-100 group-hover:bg-blue-200 rounded-lg transition-colors">
+              <ArrowLeft className="h-4 w-4 text-blue-600" />
+            </div>
+            <span className="font-semibold">Retour à l'accueil</span>
+          </Button>
         </div>
       </div>
 
@@ -827,7 +1116,7 @@ export default function FormulairePage() {
               title={detailsEtape.title}
               onSelect={(idx) => {
                 if (idx > maxReachedStep) {
-                  toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                  toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                   return
                 }
                 goToStep(idx)
@@ -838,16 +1127,17 @@ export default function FormulairePage() {
           <div className="md:hidden">
             <Sheet open={mobileStepsOpen} onOpenChange={setMobileStepsOpen}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                  <ListIcon className="h-4 w-4" />
-                  Étapes
+                <Button variant="outline" size="sm" className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-slate-200 hover:bg-white hover:border-slate-300 shadow-sm">
+                  <ListIcon className="h-4 w-4 text-slate-600" />
+                  <span className="text-slate-700 font-medium">Étapes</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-[85%] sm:w-[380px]">
-                <SheetHeader>
-                  <SheetTitle>Étapes du formulaire</SheetTitle>
+              <SheetContent side="left" className="w-[85%] sm:w-[380px] bg-gradient-to-br from-slate-50 to-white">
+                <SheetHeader className="border-b border-slate-200 pb-4">
+                  <SheetTitle className="text-xl font-bold text-slate-800">Étapes du formulaire</SheetTitle>
+                  <p className="text-sm text-slate-600 mt-1">Progression : {etape} sur {totalEtapes}</p>
                 </SheetHeader>
-                <nav aria-label="Étapes (mobile)" className="mt-4 space-y-2">
+                <nav aria-label="Étapes (mobile)" className="mt-6 space-y-3">
                   {steps.map((s) => {
                     const completed = s.index < etape
                     const current = s.index === etape
@@ -857,7 +1147,7 @@ export default function FormulairePage() {
                         key={s.key}
                         onClick={() => {
                           if (disabled) {
-                            toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                            toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                             return
                           }
                           goToStep(s.index)
@@ -865,22 +1155,36 @@ export default function FormulairePage() {
                         }}
                         aria-disabled={disabled}
                         className={cn(
-                          "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                          disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                          completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                          current && "bg-blue-50 border-blue-200 text-blue-800",
+                          "w-full text-left flex items-center gap-4 rounded-xl border px-4 py-3 transition-all duration-300",
+                          "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                          disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                          completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                          current && "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 text-blue-800 shadow-md ring-2 ring-blue-200",
                           !completed &&
                             !current &&
                             !disabled &&
-                            "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                            "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                         )}
                       >
-                        {completed ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                        )}
-                        <span className="text-sm font-medium">{s.label}</span>
+                        <div className={cn(
+                          "p-2 rounded-lg transition-all duration-300",
+                          completed && "bg-emerald-100 text-emerald-700",
+                          current && "bg-blue-100 text-blue-700",
+                          !completed && !current && !disabled && "bg-slate-100 text-slate-600",
+                          disabled && "bg-slate-50 text-slate-400"
+                        )}>
+                          {completed ? (
+                            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Circle className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium block">{s.label}</span>
+                          {current && (
+                            <span className="text-xs text-blue-600 font-medium">En cours</span>
+                          )}
+                        </div>
                       </button>
                     )
                   })}
@@ -895,9 +1199,13 @@ export default function FormulairePage() {
       <div className="grid gap-6 md:grid-cols-12">
         {/* Sidebar (hidden on small) */}
         <aside className="md:col-span-4 lg:col-span-3 hidden md:block">
-          <nav aria-label="Étapes du formulaire" className="space-y-3">
+          <nav aria-label="Étapes du formulaire" className="space-y-4">
             {/* Grouped per locataire */}
-            <Accordion type="multiple" defaultValue={[`loc-${currentLocataireGroupIndex}`]} className="space-y-2">
+            <div className="px-3 py-2">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Informations personnelles</h3>
+              <p className="text-xs text-slate-500 mt-1">Données des locataires</p>
+            </div>
+            <Accordion type="multiple" defaultValue={[`loc-${currentLocataireGroupIndex}`]} className="space-y-3">
               {locataires.map((_, i) => {
                 const idxIdentite = getEtapeIndex("identite", i)
                 const idxPro = getEtapeIndex("professionnel", i)
@@ -906,46 +1214,61 @@ export default function FormulairePage() {
                   const completed = index < etape
                   const current = index === etape
                   const disabled = index > maxReachedStep
+                  
                   return (
                     <button
                       key={`${key}-${i}`}
                       onClick={() => {
                         if (disabled) {
-                          toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                          toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                           return
                         }
                         goToStep(index)
                       }}
                       aria-disabled={disabled}
                       className={cn(
-                        "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                        completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                        current && "bg-blue-50 border-blue-200 text-blue-800",
+                        "w-full text-left flex items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-300 group",
+                        "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                        completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                        current && "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 text-blue-800 shadow-md ring-2 ring-blue-200",
                         !completed &&
                           !current &&
                           !disabled &&
-                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                       )}
                     >
-                      {completed ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                      )}
+                      <div className={cn(
+                        "p-2 rounded-lg transition-all duration-300",
+                        completed && "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200",
+                        current && "bg-blue-100 text-blue-700 group-hover:bg-blue-200",
+                        !completed && !current && !disabled && "bg-slate-100 text-slate-600 group-hover:bg-slate-200",
+                        disabled && "bg-slate-50 text-slate-400"
+                      )}>
+                        {completed ? (
+                          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        ) : key === "identite" ? (
+                          <User className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Briefcase className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </div>
                       <span className="text-sm font-medium">{label}</span>
                     </button>
                   )
                 }
 
                 return (
-                  <AccordionItem key={`loc-${i}`} value={`loc-${i}`} className="border rounded-md bg-white">
-                    <AccordionTrigger className="px-3 py-2 hover:no-underline">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold">Locataire {i + 1}</span>
+                  <AccordionItem key={`loc-${i}`} value={`loc-${i}`} className="border-0 rounded-xl bg-gradient-to-br from-slate-50 to-white shadow-sm hover:shadow-md transition-shadow duration-300">
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline rounded-t-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                          {i + 1}
+                        </div>
+                        <span className="text-sm font-semibold text-slate-800">Locataire {i + 1}</span>
                       </div>
                     </AccordionTrigger>
-                    <AccordionContent className="px-3 pb-3 pt-0 space-y-2">
+                    <AccordionContent className="px-4 pb-4 pt-0 space-y-3">
                       {section("identite", "Identité", idxIdentite)}
                       {section("professionnel", "Profession", idxPro)}
                     </AccordionContent>
@@ -955,7 +1278,11 @@ export default function FormulairePage() {
             </Accordion>
 
             {/* Global sections */}
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="px-3 py-2">
+                <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Étapes générales</h3>
+                <p className="text-xs text-slate-500 mt-1">Configuration et finalisation</p>
+              </div>
               {locataires.length > 1 &&
                 (() => {
                   const index = getEtapeIndex("enfants")
@@ -966,70 +1293,90 @@ export default function FormulairePage() {
                     <button
                       onClick={() => {
                         if (disabled) {
-                          toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                          toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                           return
                         }
                         goToStep(index)
                       }}
                       aria-disabled={disabled}
                       className={cn(
-                        "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                        completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                        current && "bg-blue-50 border-blue-200 text-blue-800",
+                        "w-full text-left flex items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-300 group",
+                        "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                        completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                        current && "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 text-blue-800 shadow-md ring-2 ring-blue-200",
                         !completed &&
                           !current &&
                           !disabled &&
-                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                       )}
                     >
-                      {completed ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                      )}
+                      <div className={cn(
+                        "p-2 rounded-lg transition-all duration-300",
+                        completed && "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200",
+                        current && "bg-blue-100 text-blue-700 group-hover:bg-blue-200",
+                        !completed && !current && !disabled && "bg-slate-100 text-slate-600 group-hover:bg-slate-200",
+                        disabled && "bg-slate-50 text-slate-400"
+                      )}>
+                        {completed ? (
+                          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Baby className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </div>
                       <span className="text-sm font-medium">Enfants</span>
                     </button>
                   )
                 })()}
 
               {[
-                { key: "garanties", label: "Garanties" },
-                { key: "recherche", label: "Recherche" },
-                { key: "dossierfacile", label: "Dossier" },
-                { key: "recapitulatif", label: "Récapitulatif" },
+                { key: "garanties", label: "Garanties", icon: Shield },
+                { key: "recherche", label: "Recherche", icon: Search },
+                { key: "dossierfacile", label: "Dossier", icon: FolderOpen },
+                { key: "recapitulatif", label: "Récapitulatif", icon: ClipboardCheck },
               ].map((g) => {
                 const index = getEtapeIndex(g.key)
                 const completed = index < etape
                 const current = index === etape
                 const disabled = index > maxReachedStep
+                const IconComponent = g.icon
+                
                 return (
                   <button
                     key={g.key}
                     onClick={() => {
                       if (disabled) {
-                        toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                        toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                         return
                       }
                       goToStep(index)
                     }}
                     aria-disabled={disabled}
                     className={cn(
-                      "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                      disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                      completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                      current && "bg-blue-50 border-blue-200 text-blue-800",
+                      "w-full text-left flex items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-300 group",
+                      "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                      disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                      completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                      current && "bg-gradient-to-r from-blue-50 to-blue-100 border-blue-300 text-blue-800 shadow-md ring-2 ring-blue-200",
                       !completed &&
                         !current &&
                         !disabled &&
-                        "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                        "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                     )}
                   >
-                    {completed ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                    ) : (
-                      <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                    )}
+                    <div className={cn(
+                      "p-2 rounded-lg transition-all duration-300",
+                      completed && "bg-emerald-100 text-emerald-700 group-hover:bg-emerald-200",
+                      current && "bg-blue-100 text-blue-700 group-hover:bg-blue-200",
+                      !completed && !current && !disabled && "bg-slate-100 text-slate-600 group-hover:bg-slate-200",
+                      disabled && "bg-slate-50 text-slate-400"
+                    )}>
+                      {completed ? (
+                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <IconComponent className="h-4 w-4" aria-hidden="true" />
+                      )}
+                    </div>
                     <span className="text-sm font-medium">{g.label}</span>
                   </button>
                 )
@@ -1371,24 +1718,26 @@ export default function FormulairePage() {
                         </div>
                         <div className="md:col-span-2 -mt-2">
                           <div className="flex flex-wrap items-center gap-2">
+                            {/* Bouton pour copier depuis le locataire 1 (toujours disponible si c'est pas le locataire 1) */}
                             {i > 0 && locataires[0]?.adresseActuelle?.trim() && (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => updateLocataire(i, "adresseActuelle", locataires[0].adresseActuelle)}
-                                className="h-8 px-2"
+                                className="h-8 px-2 text-xs"
                               >
-                                Utiliser l’adresse de Locataire 1
+                                Copier depuis Locataire 1
                               </Button>
                             )}
-                            {i > 0 && locataires[i - 1]?.adresseActuelle?.trim() && (
+                            {/* Bouton pour copier depuis le locataire précédent (seulement si différent du locataire 1) */}
+                            {i > 1 && locataires[i - 1]?.adresseActuelle?.trim() && (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => updateLocataire(i, "adresseActuelle", locataires[i - 1].adresseActuelle)}
-                                className="h-8 px-2"
+                                className="h-8 px-2 text-xs"
                               >
                                 Copier depuis Locataire {i}
                               </Button>
@@ -1532,7 +1881,7 @@ export default function FormulairePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <Label>
-                              Nom de l’entreprise / administration <span className="text-red-600">*</span>
+                              Nom de l'entreprise / administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurNom}
@@ -1564,7 +1913,7 @@ export default function FormulairePage() {
                           </div>
                           <div className="md:col-span-2 relative">
                             <Label>
-                              Adresse de l’entreprise / administration <span className="text-red-600">*</span>
+                              Adresse de l'entreprise / administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurAdresse}
@@ -1599,7 +1948,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                              Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               type="tel"
@@ -1620,7 +1969,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Date d’embauche <span className="text-red-600">*</span>
+                              Date d'embauche <span className="text-red-600">*</span>
                             </Label>
                             <DatePicker
                               id={`dateEmbauche-${i}`}
@@ -1661,7 +2010,7 @@ export default function FormulairePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <Label>
-                              Nom de l’entreprise / administration <span className="text-red-600">*</span>
+                              Nom de l'entreprise / administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurNom}
@@ -1692,7 +2041,7 @@ export default function FormulairePage() {
                           </div>
                           <div className="md:col-span-2">
                             <Label>
-                              Adresse de l’entreprise / administration <span className="text-red-600">*</span>
+                              Adresse de l'entreprise / administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurAdresse}
@@ -1704,7 +2053,7 @@ export default function FormulairePage() {
                               className={cn("mt-1", err("employeurAdresse") && "border-red-500 bg-red-50")}
                               maxLength={120}
                               aria-invalid={err("employeurAdresse")}
-                              placeholder="Commencez à taper l’adresse de l’entreprise…"
+                              placeholder="Commencez à taper l'adresse de l'entreprise…"
                             />
                             {showSuggestions &&
                               activeAddressField === `employeurAdresse-${i}` &&
@@ -1727,7 +2076,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                              Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               type="tel"
@@ -1748,7 +2097,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Date d’embauche <span className="text-red-600">*</span>
+                              Date d'embauche <span className="text-red-600">*</span>
                             </Label>
                             <DatePicker
                               id={`dateEmbauche-${i}`}
@@ -1806,7 +2155,7 @@ export default function FormulairePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <Label>
-                              Agence d’intérim principale <span className="text-red-600">*</span>
+                              Agence d'intérim principale <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.agenceInterim}
@@ -1865,7 +2214,7 @@ export default function FormulairePage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
                             <Label>
-                              Nom de l’administration / entreprise <span className="text-red-600">*</span>
+                              Nom de l'administration / entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurNom}
@@ -1897,7 +2246,7 @@ export default function FormulairePage() {
                           </div>
                           <div className="md:col-span-2 relative">
                             <Label>
-                              Adresse de l’administration <span className="text-red-600">*</span>
+                              Adresse de l'administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               value={L.employeurAdresse}
@@ -1909,7 +2258,7 @@ export default function FormulairePage() {
                               className={cn("mt-1", err("employeurAdresse") && "border-red-500 bg-red-50")}
                               maxLength={120}
                               aria-invalid={err("employeurAdresse")}
-                              placeholder="Commencez à taper l’adresse de l’administration…"
+                              placeholder="Commencez à taper l'adresse de l'administration…"
                             />
                             {showSuggestions &&
                               activeAddressField === `employeurAdresse-${i}` &&
@@ -1932,7 +2281,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Numéro de téléphone de l’administration <span className="text-red-600">*</span>
+                              Numéro de téléphone de l'administration <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               type="tel"
@@ -1953,7 +2302,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Date d’embauche <span className="text-red-600">*</span>
+                              Date d'embauche <span className="text-red-600">*</span>
                             </Label>
                             <DatePicker
                               id={`dateEmbauche-${i}`}
@@ -2038,7 +2387,7 @@ export default function FormulairePage() {
                               className={cn("mt-1", err("employeurAdresse") && "border-red-500 bg-red-50")}
                               maxLength={120}
                               aria-invalid={err("employeurAdresse")}
-                              placeholder="Commencez à taper l’adresse (numéro + rue + ville)…"
+                              placeholder="Commencez à taper l'adresse (numéro + rue + ville)…"
                             />
                             {showSuggestions &&
                               activeAddressField === `employeurAdresse-${i}` &&
@@ -2082,7 +2431,7 @@ export default function FormulairePage() {
                           </div>
                           <div>
                             <Label>
-                              Date de début d’activité <span className="text-red-600">*</span>
+                              Date de début d'activité <span className="text-red-600">*</span>
                             </Label>
                             <DatePicker
                               id={`dateDebutActivite-${i}`}
@@ -2255,7 +2604,7 @@ export default function FormulairePage() {
                               </div>
                               <div>
                                 <Label>
-                                  Nom de l’entreprise <span className="text-red-600">*</span>
+                                  Nom de l'entreprise <span className="text-red-600">*</span>
                                 </Label>
                                 <Input
                                   value={L.employeurNom}
@@ -2275,7 +2624,7 @@ export default function FormulairePage() {
                               </div>
                               <div className="md:col-span-2 relative">
                                 <Label>
-                                  Adresse de l’entreprise <span className="text-red-600">*</span>
+                                  Adresse de l'entreprise <span className="text-red-600">*</span>
                                 </Label>
                                 <Input
                                   value={L.employeurAdresse}
@@ -2290,7 +2639,7 @@ export default function FormulairePage() {
                                   )}
                                   maxLength={120}
                                   aria-invalid={showErr && proErrors.employeurAdresse}
-                                  placeholder="Commencez à taper l’adresse de l’entreprise…"
+                                  placeholder="Commencez à taper l'adresse de l'entreprise…"
                                 />
                                 {showSuggestions &&
                                   activeAddressField === `employeurAdresse-${i}` &&
@@ -2313,7 +2662,7 @@ export default function FormulairePage() {
                               </div>
                               <div>
                                 <Label>
-                                  Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                                  Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                                 </Label>
                                 <Input
                                   type="tel"
@@ -2432,7 +2781,7 @@ export default function FormulairePage() {
                               onChange={(e) => {
                                 updateLocataire(i, "situationActuelleSansEmploi", e.target.value)
                               }}
-                              placeholder="Ex: À la recherche d’un emploi, en reconversion…"
+                              placeholder="Ex: À la recherche d'un emploi, en reconversion…"
                               className={cn(
                                 "mt-1",
                                 showErr && proErrors.situationActuelleSansEmploi && "border-red-500 bg-red-50",
@@ -3000,7 +3349,7 @@ export default function FormulairePage() {
                           id="raisonDemenagement"
                           value={criteresRecherche.raisonDemenagement}
                           onChange={(e) => updateCriteresRecherche("raisonDemenagement", e.target.value)}
-                          placeholder="Mutation professionnelle, famille qui s’agrandit, séparation…"
+                          placeholder="Mutation professionnelle, famille qui s'agrandit, séparation…"
                           className="mt-1"
                           maxLength={300}
                         />
@@ -3033,7 +3382,7 @@ export default function FormulairePage() {
               {detailsEtape.type === "dossierfacile" && (
                 <div className="space-y-8">
                   <p className="text-slate-600">
-                    Si vous disposez déjà d’un dossier numérique locatif (ex : DossierFacile), vous pouvez renseigner le
+                    Si vous disposez déjà d'un dossier numérique locatif (ex : DossierFacile), vous pouvez renseigner le
                     lien ci-dessous. Sinon, ne transmettez aucune pièce justificative pour le moment. Nous vous les
                     demanderons uniquement si votre dossier est présélectionné.
                   </p>
@@ -3272,36 +3621,42 @@ export default function FormulairePage() {
                 </div>
               )}
 
-              {/* Footer actions */}
-              <div className="flex justify-between pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEtape(Math.max(1, etape - 1))}
-                  disabled={etape === 1}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Précédent
-                </Button>
+              {/* Navigation améliorée entre étapes */}
+              <div className="pt-6 border-t">
                 {etape < totalEtapes ? (
-                  <Button
-                    type="button"
-                    onClick={goNext}
-                    className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700"
-                  >
-                    {nextButtonText}
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
+                  <StepNavigation
+                    currentStep={etape}
+                    totalSteps={totalEtapes}
+                    maxReachedStep={maxReachedStep}
+                    onPrevious={() => setEtape(Math.max(1, etape - 1))}
+                    onNext={goNext}
+                    onStepClick={goToStep}
+                    canGoNext={etape < totalEtapes}
+                    canGoPrevious={etape > 1}
+                    className="mb-4"
+                  />
                 ) : (
-                  <Button
-                    type="button"
-                    onClick={ouvrirConfirmation}
-                    disabled={isSubmitting}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {isSubmitting ? "Envoi en cours..." : "Envoyer ma fiche de renseignements"}
-                  </Button>
+                  <div className="text-center">
+                    <Button
+                      type="button"
+                      onClick={ouvrirConfirmation}
+                      disabled={isSubmitting}
+                      size="lg"
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+                    >
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          Envoi en cours...
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5" />
+                          Envoyer ma fiche de renseignements
+                        </div>
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             </CardContent>

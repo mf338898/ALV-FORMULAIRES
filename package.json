@@ -3,10 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "build": "./pre-build-check.sh && next build",
+    "dev": "./pre-build-check.sh && next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "clean": "rm -rf .next && echo '🧹 Cache nettoyé'",
+    "fresh": "rm -rf .next && npm run build && npm run dev",
+    "reset": "rm -rf .next node_modules package-lock.json && npm install && npm run build && npm run dev",
+    "health": "./health-check.sh",
+    "prebuild": "./pre-build-check.sh",
+    "watchdog": "./watchdog.sh",
+    "maintenance": "./maintenance-cache.sh",
+    "cache-clean": "./maintenance-cache.sh && npm run dev",
+    "force-clean": "pkill -f 'next dev' && ./maintenance-cache.sh && npm run dev",
+    "export": "next build",
+    "deploy": "npm run build && gh-pages -d out",
+    "predeploy": "npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -67,8 +79,10 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/nodemailer": "^6.4.17",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"

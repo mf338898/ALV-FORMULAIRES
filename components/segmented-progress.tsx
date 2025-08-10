@@ -3,6 +3,7 @@
 import type React from "react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { CheckCircle2, Circle, Play, ArrowRight } from "lucide-react"
 
 export type SegmentedStep = {
   key: string
@@ -39,15 +40,43 @@ export function CircularStepIndicator({
     height: size,
     borderRadius: "9999px",
     backgroundImage: `conic-gradient(${progressColor} ${angle}deg, ${trackColor} 0deg)`,
+    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.15)",
   }
   const innerSize = Math.max(0, size - 8)
   return (
-    <div aria-hidden="true" className="relative grid place-items-center" style={ringStyle}>
+    <div aria-hidden="true" className="relative grid place-items-center animate-pulse" style={ringStyle}>
       <div
-        className="bg-white rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-700 tabular-nums"
+        className="bg-white rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-700 tabular-nums shadow-sm border-2 border-white"
         style={{ width: innerSize, height: innerSize }}
       >
         {current}/{total}
+      </div>
+      {/* Animated dots around the circle */}
+      <div className="absolute inset-0 w-full h-full">
+        {Array.from({ length: total }, (_, i) => {
+          const dotAngle = (i * 360) / total
+          const dotRadius = size / 2 - 2
+          const x = Math.cos((dotAngle - 90) * (Math.PI / 180)) * dotRadius + size / 2
+          const y = Math.sin((dotAngle - 90) * (Math.PI / 180)) * dotRadius + size / 2
+          const isCompleted = i < current
+          const isCurrent = i === current - 1
+          
+          return (
+            <div
+              key={i}
+              className={cn(
+                "absolute w-2 h-2 rounded-full transition-all duration-300",
+                isCompleted && "bg-emerald-500 shadow-lg shadow-emerald-500/50",
+                isCurrent && "bg-blue-600 shadow-lg shadow-blue-600/50 animate-pulse",
+                !isCompleted && !isCurrent && "bg-slate-300"
+              )}
+              style={{
+                left: x - 4,
+                top: y - 4,
+              }}
+            />
+          )
+        })}
       </div>
     </div>
   )
@@ -66,97 +95,126 @@ export function SegmentedProgress({
   return (
     <div className={cn("w-full", className)}>
       <TooltipProvider delayDuration={100}>
-        {/* Numbers row (desktop/tablet) with tooltips */}
-        <div
-          className="hidden md:grid mb-1 text-[11px]"
-          style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
-          aria-hidden="true"
-        >
-          {steps.map((s, idx) => {
-            const disabled = s.index > maxReachedStep
-            const completed = s.index < currentStep
-            const current = s.index === currentStep
-            return (
-              <div key={s.key} className="flex items-center justify-center select-none">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      className={cn(
-                        "px-1.5 py-0.5 rounded transition-colors tabular-nums tracking-tight",
-                        current && "text-blue-800 font-bold",
-                        completed && "text-emerald-700 font-semibold",
-                        disabled && "text-slate-400",
-                        !current && !completed && !disabled && "text-slate-600",
-                      )}
-                    >
-                      {idx + 1}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">
-                    <p className="font-medium">{s.label}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Segmented bar */}
-        <div className="relative">
-          <div
-            className="grid gap-[2px] rounded-md overflow-hidden"
-            style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
-            role="group"
-            aria-label="Progression par étapes"
-          >
-            {steps.map((s) => {
-              const disabled = s.index > maxReachedStep
-              const completed = s.index < currentStep
-              const current = s.index === currentStep
-
-              const segmentBtn = (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (disabled) return
-                    onSelect?.(s.index)
-                  }}
-                  aria-label={`Étape ${s.index}: ${s.label}${disabled ? " (verrouillée)" : ""}`}
-                  aria-current={current ? "step" : undefined}
-                  className={cn(
-                    "relative h-3 transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500",
-                    completed && "bg-emerald-500 hover:bg-emerald-600",
-                    current && "bg-blue-700",
-                    !completed && !current && "bg-slate-200 hover:bg-slate-300",
-                    disabled && "cursor-not-allowed hover:cursor-not-allowed",
-                  )}
-                />
-              )
-
-              return (
-                <div key={s.key} className="w-full">
-                  <Tooltip>
-                    <TooltipTrigger asChild>{segmentBtn}</TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                      <p className="font-medium">{s.label}</p>
-                      {disabled ? <p className="text-slate-500">Étape verrouillée</p> : null}
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              )
-            })}
+        {/* Nouvelle barre de progression simplifiée et intuitive */}
+        <div className="relative mb-6">
+          {/* Barre de progression principale */}
+          <div className="relative h-3 bg-slate-100 rounded-full overflow-hidden">
+            {/* Barre de progression complétée */}
+            <div 
+              className="absolute left-0 top-0 h-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-700 ease-out"
+              style={{ width: `${((currentStep - 1) / (total - 1)) * 100}%` }}
+            />
+            
+            {/* Barre de progression actuelle */}
+            <div 
+              className="absolute left-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700 ease-out"
+              style={{ width: `${(currentStep / total) * 100}%` }}
+            />
           </div>
 
-          {/* Centered title overlay */}
-          {title ? (
-            <div className="pointer-events-none absolute inset-0 hidden md:flex items-center justify-center">
-              <span className="px-2 py-0.5 text-[12px] font-medium text-slate-700 bg-white/80 backdrop-blur rounded">
-                {title} • Étape {currentStep} sur {total}
-              </span>
+          {/* Étapes avec indicateurs visuels clairs */}
+          <div className="relative -mt-1.5">
+            <div className="flex justify-between">
+              {steps.map((step, idx) => {
+                const isCompleted = step.index < currentStep
+                const isCurrent = step.index === currentStep
+                const isDisabled = step.index > maxReachedStep
+                const isAccessible = step.index <= maxReachedStep
+
+                return (
+                  <div key={step.key} className="relative flex flex-col items-center">
+                    {/* Indicateur d'étape */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isAccessible && onSelect) {
+                          onSelect(step.index)
+                        }
+                      }}
+                      disabled={!isAccessible}
+                      className={cn(
+                        "relative w-8 h-8 rounded-full border-2 transition-all duration-300 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2",
+                        isCompleted && [
+                          "bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/30",
+                          "hover:bg-emerald-600 hover:border-emerald-600 hover:shadow-xl hover:shadow-emerald-500/40"
+                        ],
+                        isCurrent && [
+                          "bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-500/30 ring-2 ring-blue-200",
+                          "hover:bg-blue-600 hover:border-blue-600 hover:shadow-xl hover:shadow-blue-500/40"
+                        ],
+                        !isCompleted && !isCurrent && isAccessible && [
+                          "bg-white border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50",
+                          "hover:shadow-md"
+                        ],
+                        isDisabled && [
+                          "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed",
+                          "hover:scale-100 hover:shadow-none"
+                        ]
+                      )}
+                    >
+                      {/* Icône ou numéro selon l'état */}
+                      {isCompleted ? (
+                        <CheckCircle2 className="w-4 h-4 mx-auto" />
+                      ) : isCurrent ? (
+                        <Play className="w-3 h-3 mx-auto ml-0.5" />
+                      ) : (
+                        <span className="text-xs font-semibold">{step.index}</span>
+                      )}
+                    </button>
+
+                    {/* Ligne de connexion (sauf pour la dernière étape) */}
+                    {idx < steps.length - 1 && (
+                      <div className="absolute top-4 left-1/2 w-full h-0.5 bg-slate-200 -z-10" />
+                    )}
+
+                    {/* Label de l'étape */}
+                    <div className="mt-2 text-center max-w-24">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={cn(
+                            "block text-xs font-medium transition-colors duration-200 cursor-pointer",
+                            isCurrent && "text-blue-700 font-semibold",
+                            isCompleted && "text-emerald-700",
+                            !isCompleted && !isCurrent && isAccessible && "text-slate-600 hover:text-slate-800",
+                            isDisabled && "text-slate-400 cursor-not-allowed"
+                          )}>
+                            {step.label}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="text-xs max-w-48">
+                          <p className="font-medium">{step.label}</p>
+                          {isCurrent && <p className="text-blue-600">Étape en cours</p>}
+                          {isCompleted && <p className="text-emerald-600">Étape terminée</p>}
+                          {isDisabled && <p className="text-slate-500">Étape verrouillée</p>}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+
+                    {/* Indicateur de progression pour l'étape actuelle */}
+                    {isCurrent && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-600 rounded-full animate-ping" />
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          ) : null}
+          </div>
         </div>
+
+        {/* Titre centré avec indicateur de progression */}
+        {title && (
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border border-slate-200 shadow-sm">
+              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+              <h2 className="text-lg font-semibold text-slate-800">{title}</h2>
+              <div className="flex items-center gap-1 text-sm text-slate-600">
+                <span className="font-medium text-blue-600">{currentStep}</span>
+                <ArrowRight className="w-3 h-3" />
+                <span>{total}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </TooltipProvider>
 
       {/* A11y live region for screen readers */}

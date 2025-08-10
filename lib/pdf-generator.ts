@@ -9,20 +9,20 @@ const TEXT_INFO = rgb(110 / 255, 110 / 255, 110 / 255) // #6E6E6E (secondary tex
 const BLACK = rgb(0, 0, 0)
 const SEP_GRAY = rgb(218 / 255, 218 / 255, 218 / 255) // #DADADA separator
 
-// Page and layout (A4)
+// Page and layout (A4) - OPTIMISÉ POUR 1 PAGE ET IMPRESSION
 const PAGE_WIDTH = 595.28
 const PAGE_HEIGHT = 841.89
-const MARGIN = 48
-const GUTTER = 28
-const LABEL_WIDTH = 138
-const VALUE_INDENT = 6
-const TITLE_SIZE = 18 // Document main title
-const SECTION_SIZE = 13 // Section titles (13–14 pt range)
-const LABEL_SIZE = 10
-const BODY_SIZE = 11
-const LINE_HEIGHT = 12 // ~11pt body -> ~12pt line height
-const LONG_LINE_HEIGHT = Math.round(BODY_SIZE * 1.35) // ≈ 15 for readability on long wraps
-const BOTTOM_RESERVE = 72 // safe area above footer
+const MARGIN = 35 // Réduit de 48 à 35
+const GUTTER = 20 // Réduit de 28 à 20
+const LABEL_WIDTH = 120 // Réduit de 138 à 120
+const VALUE_INDENT = 4 // Réduit de 6 à 4
+const TITLE_SIZE = 17 // Augmenté de 16 à 17 pour l'impression
+const SECTION_SIZE = 13 // Augmenté de 12 à 13 pour l'impression
+const LABEL_SIZE = 10 // Augmenté de 9 à 10 pour l'impression
+const BODY_SIZE = 11 // Augmenté de 10 à 11 pour l'impression
+const LINE_HEIGHT = 12 // Augmenté de 11 à 12 pour l'impression
+const LONG_LINE_HEIGHT = Math.round(BODY_SIZE * 1.3) // ≈ 14 pour la lisibilité
+const BOTTOM_RESERVE = 60 // Réduit de 72 à 60
 
 // Utilities
 const nonEmpty = (v?: string | null) => Boolean(v && String(v).trim() !== "")
@@ -37,8 +37,8 @@ function toTitleCase(s?: string | null) {
 
 function normalizeCivilite(c?: string | null) {
   const v = (c || "").toLowerCase().trim()
-  if (v.startsWith("m.") || v === "m" || v.startsWith("mr")) return "M."
-  if (v.startsWith("mme") || v.includes("madame") || v.startsWith("mlle") || v.startsWith("mademoiselle")) return "Mme"
+  if (v.startsWith("m.") || v === "m" || v.startsWith("mr") || v === "homme") return "M."
+  if (v.startsWith("mme") || v.includes("madame") || v === "femme" || v.startsWith("mlle") || v.startsWith("mademoiselle")) return "Mme"
   return c || ""
 }
 
@@ -188,8 +188,20 @@ function formatLieuNaissance(input?: string | null) {
   return raw
 }
 
-// Data rows
-type Row = { label: string; value: string | string[]; highlight?: boolean }
+// Type spécial pour les revenus complémentaires avec formatage
+type RevenuFormatted = {
+  type: 'revenu'
+  label: string
+  montant: string
+}
+
+// Type Row modifié pour supporter le formatage spécial
+type Row = { 
+  label: string; 
+  value: string | string[] | RevenuFormatted[]; 
+  highlight?: boolean;
+  specialFormat?: 'revenus' // Indicateur pour le formatage spécial
+}
 
 // "Sans emploi" precision handling
 function contractOrStatus(loc?: Locataire) {
@@ -212,6 +224,11 @@ function contractOrStatus(loc?: Locataire) {
     }
   }
 
+  // Mettre en majuscules pour les types de contrat courants
+  if (lower === "cdi" || lower === "cdd" || lower === "stage" || lower === "alternance" || lower === "intérim" || lower === "interim") {
+    return base.toUpperCase()
+  }
+
   return base || dash
 }
 
@@ -228,34 +245,35 @@ function identityRows(l?: Locataire): Row[] {
     { label: "Nom", value: pdfSafe(toTitleCase(l?.nom) || dash) },
     { label: "Prénom", value: pdfSafe(toTitleCase(l?.prenom) || dash) },
     { label: "Date et lieu de naissance", value: pdfSafe(dateLieu) },
-    { label: "Adresse (ligne 1)", value: pdfSafe(addr1) },
-    { label: "Adresse (ligne 2)", value: pdfSafe(addr2) },
     { label: "Email", value: pdfSafe(showOrDash(l?.email)) },
     { label: "Téléphone", value: pdfSafe(showOrDash(l?.telephone)) },
+    { label: "Domicile (ligne 1)", value: pdfSafe(addr1) },
+    { label: "Domicile (ligne 2)", value: pdfSafe(addr2) },
     { label: "Situation conjugale", value: pdfSafe(showOrDash(l?.situationConjugale)) },
   ]
 }
 
-function revenusAdditionnelsLines(list?: RevenuAdditionnel[]) {
-  if (!list || list.length === 0) return [dash]
-  const items = list
+function revenusAdditionnelsLines(list?: RevenuAdditionnel[]): RevenuFormatted[] {
+  if (!list || list.length === 0) return []
+  return list
     .filter((r) => nonEmpty(r.type) || nonEmpty(r.montant) || nonEmpty(r.precision))
     .map((r) => {
       const label = r.type === "Autre" ? r.precision || "Autre" : r.type || "Revenu complémentaire"
-      const montant = euro(r.montant)
-      const name = pdfSafe(label)
-      if (!nonEmpty(name) && montant === dash) return ""
-      return `${name}${montant !== dash ? ` : ${montant}/mois` : ""}`
+      const montant = nonEmpty(r.montant) ? r.montant : ""
+      return {
+        type: 'revenu' as const,
+        label: pdfSafe(label),
+        montant: montant
+      }
     })
-    .filter(Boolean)
-  return items.length ? items : [dash]
+    .filter((r) => r.label || r.montant)
 }
 
 function proRows(l?: Locataire): Row[] {
   const [empAddr1, empAddr2] = splitAddressLines(l?.employeurAdresse)
   const empAddrValue = [pdfSafe(empAddr1), pdfSafe(empAddr2)]
   return [
-    { label: "Type de contrat / statut", value: pdfSafe(contractOrStatus(l)) },
+    { label: "Type de contrat / statut", value: pdfSafe(contractOrStatus(l)), highlight: true }, // highlight pour le mettre en gras
     { label: "Profession", value: pdfSafe(showOrDash(l?.profession)) },
     { label: "Employeur (nom)", value: pdfSafe(showOrDash(l?.employeurNom)) },
     { label: "Employeur (adresse)", value: empAddrValue },
@@ -263,7 +281,11 @@ function proRows(l?: Locataire): Row[] {
     { label: "Date d'embauche", value: pdfSafe(showOrDash(l?.dateEmbauche)) },
     { label: "Date de fin de contrat", value: pdfSafe(showOrDash(l?.dateFinContrat)) },
     { label: "Salaire net mensuel (€)", value: euro(l?.salaire), highlight: true },
-    { label: "Revenus complémentaires", value: revenusAdditionnelsLines(l?.revenusAdditionnels) },
+    { 
+      label: "Revenus complémentaires", 
+      value: revenusAdditionnelsLines(l?.revenusAdditionnels), 
+      specialFormat: 'revenus' 
+    },
   ]
 }
 
@@ -284,23 +306,23 @@ function drawFooter(page: any, fontReg: any) {
   page.drawText(text, { x, y, size, font: fontReg, color: TEXT_INFO })
 }
 
-// Section header with extra top spacing and 1px separator in #DADADA
+// Section header with extra top spacing and 1px separator in #DADADA - OPTIMISÉ
 function drawSectionHeader(page: any, title: string, x: number, y: number, fontBold: any) {
-  // Add 16px margin above titles (within 14–18 range)
-  y -= 16
+  // Add 12px margin above titles (réduit de 16 à 12)
+  y -= 12
   const header = pdfSafe(title.toUpperCase())
   page.drawText(header, { x, y, size: SECTION_SIZE, font: fontBold, color: PRIMARY })
-  const yy = y - 12
+  const yy = y - 10 // Réduit de 12 à 10
   page.drawLine({
     start: { x, y: yy },
     end: { x: page.getWidth() - x, y: yy },
     thickness: 1,
     color: SEP_GRAY,
   })
-  return yy - 12 // uniform gap below header
+  return yy - 10 // Réduit de 12 à 10
 }
 
-// Inline section header with "label: value" on same line
+// Inline section header with "label: value" on same line - OPTIMISÉ
 function drawSectionHeaderWithInlineValue(
   page: any,
   title: string,
@@ -310,17 +332,17 @@ function drawSectionHeaderWithInlineValue(
   y: number,
   fonts: { reg: any; bold: any },
 ) {
-  // Extra spacing above (16px)
-  y -= 16
+  // Extra spacing above (12px) - Réduit de 16 à 12
+  y -= 12
   const header = pdfSafe(title.toUpperCase())
   page.drawText(header, { x, y, size: SECTION_SIZE, font: fonts.bold, color: PRIMARY })
 
   // Measure header to place inline label/value
   const headerWidth = fonts.bold.widthOfTextAtSize(header, SECTION_SIZE)
-  const gap = 12
+  const gap = 10 // Réduit de 12 à 10
   const xInline = x + headerWidth + gap
 
-  // Inline "Nombre d’enfants à charge : N"
+  // Inline "Nombre d'enfants à charge : N"
   const labelText = pdfSafe(inlineLabel + " : ")
   const labelWidth = fonts.bold.widthOfTextAtSize(labelText, LABEL_SIZE + 1)
   page.drawText(labelText, { x: xInline, y, size: LABEL_SIZE + 1, font: fonts.bold, color: BLACK })
@@ -333,21 +355,21 @@ function drawSectionHeaderWithInlineValue(
   })
 
   // Separator below full line
-  const yy = y - 12
+  const yy = y - 10 // Réduit de 12 à 10
   page.drawLine({
     start: { x, y: yy },
     end: { x: page.getWidth() - x, y: yy },
     thickness: 1,
     color: SEP_GRAY,
   })
-  return yy - 12
+  return yy - 10 // Réduit de 12 à 10
 }
 
-// Header on each page: centered logo, centered uppercase title, centered info text
+// Header on each page: centered logo, centered uppercase title, centered info text - OPTIMISÉ
 async function drawHeader(page: any, pdf: PDFDocument, fontBold: any, fontReg: any) {
   const yTop = PAGE_HEIGHT - MARGIN
 
-  // Logo (centered, max-height 36px, margin-bottom 14px)
+  // Logo (centered, max-height 30px, margin-bottom 10px) - OPTIMISÉ
   let logoImage: any | null = null
   try {
     const logoPath = path.join(process.cwd(), "public", "images", "logo-alv.png")
@@ -359,28 +381,27 @@ async function drawHeader(page: any, pdf: PDFDocument, fontBold: any, fontReg: a
 
   let y = yTop
   if (logoImage) {
-    const logoHeight = 36 // within 32–36px
+    const logoHeight = 30 // Réduit de 36 à 30
     const ratio = logoHeight / logoImage.height
     const logoWidth = logoImage.width * ratio
     const x = (PAGE_WIDTH - logoWidth) / 2
     page.drawImage(logoImage, { x, y: yTop - logoHeight, width: logoWidth, height: logoHeight })
-    y = yTop - logoHeight - 14 // space below logo
+    y = yTop - logoHeight - 10 // Réduit de 14 à 10
   } else {
-    y = yTop - 14
+    y = yTop - 10
   }
 
-  // Title (centered, uppercase, brand blue, margin-top 10px relative to logo block)
-  y -= 10
+  // Title (centered, uppercase, brand blue, margin-top 8px) - OPTIMISÉ
+  y -= 8
   drawCenteredText(page, pdfSafe("FICHE DE RENSEIGNEMENT LOCATAIRES"), y, fontBold, TITLE_SIZE, PRIMARY)
   y -= TITLE_SIZE
 
-  // Small centered grey paragraph (BODY_SIZE - 1 pt), line-height ~1.3, max-width ~85%, margin-top 7px
-  y -= 7
+  // Small centered grey paragraph (BODY_SIZE - 1 pt), line-height ~1.2, max-width ~90%, margin-top 5px - OPTIMISÉ
+  y -= 5
   const intro =
     "Document strictement confidentiel – destiné à un usage locatif. " +
-    "Ce document synthétise les informations personnelles, professionnelles et financières communiquées via notre formulaire en ligne. " +
-    "Il permet d’étudier le profil du ou des candidats locataires en amont de l’organisation d’une visite."
-  const maxWidth = PAGE_WIDTH * 0.85
+    "Ce document synthétise les informations personnelles, professionnelles et financières communiquées via notre formulaire en ligne."
+  const maxWidth = PAGE_WIDTH * 0.9
   const paragraphs: string[] = []
   {
     const words = pdfSafe(intro).split(/\s+/)
@@ -401,10 +422,10 @@ async function drawHeader(page: any, pdf: PDFDocument, fontBold: any, fontReg: a
     const w = fontReg.widthOfTextAtSize(line, BODY_SIZE - 1)
     const x = (PAGE_WIDTH - w) / 2
     page.drawText(line, { x, y, size: BODY_SIZE - 1, font: fontReg, color: TEXT_INFO })
-    y -= Math.round((BODY_SIZE - 1) * 1.3)
+    y -= Math.round((BODY_SIZE - 1) * 1.2) // Réduit de 1.3 à 1.2
   }
 
-  return y - 8
+  return y - 6 // Réduit de 8 à 6
 }
 
 // Context for pagination-aware drawing
@@ -441,25 +462,114 @@ type PreparedRow = { parts: PreparedPart[]; totalHeight: number }
 
 function prepareRowParts(row: Row, font: any, colMaxWidth: number): PreparedRow {
   const maxWidth = colMaxWidth - LABEL_WIDTH - VALUE_INDENT
-  const values = Array.isArray(row.value) ? (row.value.length ? row.value : [dash]) : [row.value || dash]
-  const parts: PreparedPart[] = values.map((part) => {
-    const lines = wrapByWidth(part, font, BODY_SIZE, maxWidth)
+  
+  // Gestion spéciale pour les revenus complémentaires
+  if (row.specialFormat === 'revenus' && Array.isArray(row.value) && row.value.length > 0) {
+    const revenus = row.value as RevenuFormatted[]
+    const parts: PreparedPart[] = []
+    
+    for (const revenu of revenus) {
+      // Pour chaque revenu, créer une ligne avec le label et le montant
+      const text = `${revenu.label} : ${revenu.montant} €/mois`
+      const lines = wrapByWidth(text, font, BODY_SIZE, maxWidth)
+      const lh = lines.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      parts.push({ lines, lh })
+      
+      // Ajouter un espace entre chaque revenu (saut de ligne)
+      if (revenus.indexOf(revenu) < revenus.length - 1) {
+        parts.push({ lines: [""], lh: LINE_HEIGHT / 2 }) // Espace réduit entre les revenus
+      }
+    }
+    
+    const totalHeight = parts.reduce((acc: number, p: PreparedPart) => acc + p.lines.length * p.lh, 0)
+    return { parts, totalHeight }
+  }
+  
+  // Gestion normale pour les autres types (seulement string et string[])
+  if (typeof row.value === 'string') {
+    const lines = wrapByWidth(row.value || dash, font, BODY_SIZE, maxWidth)
     const lh = lines.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
-    return { lines, lh }
-  })
-  const totalHeight = parts.reduce((acc, p) => acc + p.lines.length * p.lh, 0)
-  return { parts, totalHeight }
+    const totalHeight = lines.length * lh
+    return { parts: [{ lines, lh }], totalHeight }
+  }
+  
+  if (Array.isArray(row.value) && row.value.length > 0) {
+    // Filtrer pour ne garder que les chaînes
+    const stringValues = row.value.filter(v => typeof v === 'string') as string[]
+    if (stringValues.length === 0) {
+      const lines = wrapByWidth(dash, font, BODY_SIZE, maxWidth)
+      const lh = LINE_HEIGHT
+      return { parts: [{ lines, lh }], totalHeight: lh }
+    }
+    
+    const parts: PreparedPart[] = stringValues.map((part) => {
+      const lines = wrapByWidth(part, font, BODY_SIZE, maxWidth)
+      const lh = lines.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      return { lines, lh }
+    })
+    const totalHeight = parts.reduce((acc, p) => acc + p.lines.length * p.lh, 0)
+    return { parts, totalHeight }
+  }
+  
+  // Fallback pour les cas vides
+  const lines = wrapByWidth(dash, font, BODY_SIZE, maxWidth)
+  const lh = LINE_HEIGHT
+  return { parts: [{ lines, lh }], totalHeight: lh }
 }
 
 function drawLabeledRowFromPrepared(ctx: DocContext, row: Row, prepared: PreparedRow, xLabel: number, xValue: number) {
   const valueFont = row.highlight ? ctx.fonts.bold : ctx.fonts.reg
+  
   // label at starting y
   ctx.page.drawText(pdfSafe(row.label), { x: xLabel, y: ctx.y, size: LABEL_SIZE, font: ctx.fonts.bold, color: BLACK })
-  // draw all lines
+  
+  // Gestion spéciale pour les revenus complémentaires
+  if (row.specialFormat === 'revenus' && Array.isArray(row.value) && row.value.length > 0) {
+    const revenus = row.value as RevenuFormatted[]
+    
+    // Saut de ligne direct après le label
+    let yy = ctx.y - LINE_HEIGHT
+    
+    for (const revenu of revenus) {
+      // Dessiner le label du revenu (même position x que le label principal)
+      const labelText = `${revenu.label} : `
+      const labelWidth = ctx.fonts.reg.widthOfTextAtSize(labelText, BODY_SIZE)
+      
+      ctx.page.drawText(labelText, { x: xLabel, y: yy, size: BODY_SIZE, font: ctx.fonts.reg, color: BLACK })
+      
+      // Dessiner le montant en gras (juste après le label)
+      const montantText = `${revenu.montant} €/mois`
+      ctx.page.drawText(montantText, { 
+        x: xLabel + labelWidth, 
+        y: yy, 
+        size: BODY_SIZE, 
+        font: ctx.fonts.bold, 
+        color: BLACK 
+      })
+      
+      yy -= LINE_HEIGHT
+      
+      // Ajouter un espace entre les revenus (sauf pour le dernier)
+      if (revenus.indexOf(revenu) < revenus.length - 1) {
+        yy -= LINE_HEIGHT / 2
+      }
+    }
+    
+    ctx.y = yy - 2
+    return
+  }
+  
+  // Gestion normale pour les autres types
   let yy = ctx.y
   for (const part of prepared.parts) {
-    for (const line of part.lines) {
-      ctx.page.drawText(pdfSafe(line), { x: xValue, y: yy, size: BODY_SIZE, font: valueFont, color: BLACK })
+    for (let i = 0; i < part.lines.length; i++) {
+      const line = part.lines[i]
+      // Ignorer les lignes vides (espaces entre revenus)
+      if (line.trim() === "") continue
+      
+      // Première ligne : position normale, lignes suivantes : indentées
+      const xPos = i === 0 ? xValue : xValue + 20 // Indentation de 20px pour les lignes de continuation
+      ctx.page.drawText(pdfSafe(line), { x: xPos, y: yy, size: BODY_SIZE, font: valueFont, color: BLACK })
       yy -= part.lh
     }
   }
@@ -467,28 +577,28 @@ function drawLabeledRowFromPrepared(ctx: DocContext, row: Row, prepared: Prepare
   ctx.y = Math.min(yy, ctx.y - LINE_HEIGHT) - 2
 }
 
-// Column headings helper
-function drawColumnHeadingsInline(ctx: DocContext, xLeft: number, xRight?: number) {
-  ctx.page.drawText(pdfSafe("Locataire 1"), { x: xLeft, y: ctx.y, size: 12, font: ctx.fonts.bold, color: PRIMARY })
+// Column headings helper - OPTIMISÉ avec numérotation dynamique
+function drawColumnHeadingsInline(ctx: DocContext, xLeft: number, xRight?: number, leftNumber: number = 1, rightNumber: number = 2) {
+  ctx.page.drawText(pdfSafe(`Locataire ${leftNumber}`), { x: xLeft, y: ctx.y, size: 11, font: ctx.fonts.bold, color: PRIMARY }) // Réduit de 12 à 11
   if (typeof xRight === "number") {
-    ctx.page.drawText(pdfSafe("Locataire 2"), { x: xRight, y: ctx.y, size: 12, font: ctx.fonts.bold, color: PRIMARY })
+    ctx.page.drawText(pdfSafe(`Locataire ${rightNumber}`), { x: xRight, y: ctx.y, size: 11, font: ctx.fonts.bold, color: PRIMARY }) // Réduit de 12 à 11
   }
-  ctx.y -= 16
+  ctx.y -= 14 // Réduit de 16 à 14
 }
 
-// Two columns, aligned, with pagination
-async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire, right?: Locataire) {
+// Two columns, aligned, with pagination - OPTIMISÉ
+async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire, right?: Locataire, leftNumber: number = 1, rightNumber: number = 2) {
   const total = PAGE_WIDTH - 2 * MARGIN
   const colWidth = (total - GUTTER) / 2
   const xLeft = MARGIN
   const xRight = MARGIN + colWidth + GUTTER
 
   // Column headings
-  await ensureSpace(ctx, 20)
-  drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined)
+  await ensureSpace(ctx, 18) // Réduit de 20 à 18
+  drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined, leftNumber, rightNumber)
 
   // Identité
-  await ensureSpace(ctx, 32)
+  await ensureSpace(ctx, 28) // Réduit de 32 à 28
   ctx.y = drawSectionHeader(ctx.page, "Identité", MARGIN, ctx.y, ctx.fonts.bold)
 
   const layout = {
@@ -511,10 +621,10 @@ async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire
 
     const prepL = prepareRowParts(rL, fontLeft, layout.colWidth)
     const prepR = prepareRowParts(rR, fontRight, layout.colWidth)
-    const pairHeight = Math.max(prepL.totalHeight, prepR.totalHeight) + 2
+    const pairHeight = Math.max(prepL.totalHeight, prepR.totalHeight) + 1 // Réduit de 2 à 1
 
     // If not enough space, break page and redraw column headings
-    ctx.drawColumnHeadingsNext = () => drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined)
+    ctx.drawColumnHeadingsNext = () => drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined, leftNumber, rightNumber)
     await ensureSpace(ctx, pairHeight)
 
     // draw both starting at same yStart
@@ -528,7 +638,7 @@ async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire
   }
 
   // Situation professionnelle
-  await ensureSpace(ctx, 32)
+  await ensureSpace(ctx, 28) // Réduit de 32 à 28
   ctx.y = drawSectionHeader(ctx.page, "Situation professionnelle", MARGIN, ctx.y, ctx.fonts.bold)
 
   const rowsProL = proRows(left)
@@ -543,9 +653,9 @@ async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire
 
     const prepL = prepareRowParts(rL, fontLeft, colWidth)
     const prepR = prepareRowParts(rR, fontRight, colWidth)
-    const pairHeight = Math.max(prepL.totalHeight, prepR.totalHeight) + 2
+    const pairHeight = Math.max(prepL.totalHeight, prepR.totalHeight) + 1 // Réduit de 2 à 1
 
-    ctx.drawColumnHeadingsNext = () => drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined)
+    ctx.drawColumnHeadingsNext = () => drawColumnHeadingsInline(ctx, xLeft, right ? xRight : undefined, leftNumber, rightNumber)
     await ensureSpace(ctx, pairHeight)
 
     const yStart = ctx.y
@@ -558,19 +668,19 @@ async function drawTwoColumnsAlignedWithBreaks(ctx: DocContext, left?: Locataire
   }
 }
 
-// Single, centered column (for 1 tenant), with pagination
-async function drawSingleCenteredColumnWithBreaks(ctx: DocContext, l?: Locataire) {
+// Single, centered column (for 1 tenant), with pagination - OPTIMISÉ
+async function drawSingleCenteredColumnWithBreaks(ctx: DocContext, l?: Locataire, locataireNumber: number = 1) {
   const total = PAGE_WIDTH - 2 * MARGIN
   const colWidth = (total - GUTTER) / 2
   const xCenter = MARGIN + (total - colWidth) / 2
 
   // Heading
-  await ensureSpace(ctx, 20)
-  ctx.page.drawText(pdfSafe("Locataire 1"), { x: xCenter, y: ctx.y, size: 12, font: ctx.fonts.bold, color: PRIMARY })
-  ctx.y -= 16
+  await ensureSpace(ctx, 18) // Réduit de 20 à 18
+  ctx.page.drawText(pdfSafe(`Locataire ${locataireNumber}`), { x: xCenter, y: ctx.y, size: 11, font: ctx.fonts.bold, color: PRIMARY }) // Réduit de 12 à 11
+  ctx.y -= 14 // Réduit de 16 à 14
 
   // Identité
-  await ensureSpace(ctx, 32)
+  await ensureSpace(ctx, 28) // Réduit de 32 à 28
   ctx.y = drawSectionHeader(ctx.page, "Identité", xCenter, ctx.y, ctx.fonts.bold)
   const xLabel = xCenter
   const xValue = xCenter + LABEL_WIDTH + VALUE_INDENT
@@ -578,17 +688,17 @@ async function drawSingleCenteredColumnWithBreaks(ctx: DocContext, l?: Locataire
   for (const row of identityRows(l)) {
     const fontValue = row.highlight ? ctx.fonts.bold : ctx.fonts.reg
     const prep = prepareRowParts(row, fontValue, colWidth)
-    await ensureSpace(ctx, prep.totalHeight + 2)
+    await ensureSpace(ctx, prep.totalHeight + 1) // Réduit de 2 à 1
     drawLabeledRowFromPrepared(ctx, row, prep, xLabel, xValue)
   }
 
   // Situation professionnelle
-  await ensureSpace(ctx, 32)
+  await ensureSpace(ctx, 28) // Réduit de 32 à 28
   ctx.y = drawSectionHeader(ctx.page, "Situation professionnelle", xCenter, ctx.y, ctx.fonts.bold)
   for (const row of proRows(l)) {
     const fontValue = row.highlight ? ctx.fonts.bold : ctx.fonts.reg
     const prep = prepareRowParts(row, fontValue, colWidth)
-    await ensureSpace(ctx, prep.totalHeight + 2)
+    await ensureSpace(ctx, prep.totalHeight + 1) // Réduit de 2 à 1
     drawLabeledRowFromPrepared(ctx, row, prep, xLabel, xValue)
   }
 }
@@ -602,169 +712,178 @@ export function buildLocatairePdfFilename(data: AppFormData): string {
   return `FR-${safe || "Locataire"}.pdf`
 }
 
-// Main generator
+// Main generator - OPTIMISÉ POUR 1 PAGE + PAGINATION INTELLIGENTE
 export async function generatePdf(data: AppFormData): Promise<Buffer> {
   const pdf = await PDFDocument.create()
   const fontReg = await pdf.embedFont(StandardFonts.Helvetica)
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
 
   const locs = data.locataires || []
-  // Build pairs: [1,2] page 1, [3,4] page 2 ... (we will still paginate within each page as needed)
-  const pairs: Array<[Locataire | undefined, Locataire | undefined]> = []
-  if (locs.length <= 1) {
-    pairs.push([locs[0], undefined])
-  } else {
-    for (let i = 0; i < locs.length; i += 2) {
-      pairs.push([locs[i], locs[i + 1]])
-    }
-  }
+  
+  // STRATÉGIE DE PAGINATION OPTIMISÉE :
+  // - Page 1 : Locataires 1-2 (doit tenir sur 1 page)
+  // - Page 2 : Locataires 3-4 (si ils existent)
+  const page1Locs = locs.slice(0, 2)
+  const page2Locs = locs.slice(2, 4)
 
-  // Start first page
-  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-  let y = await drawHeader(page, pdf, fontBold, fontReg)
-  y -= 6
+  // Page 1 - Locataires 1-2 (doit tenir sur 1 page)
+  const page1 = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y1 = await drawHeader(page1, pdf, fontBold, fontReg)
+  y1 -= 4 // Réduit de 6 à 4
 
-  const ctx: DocContext = {
+  const ctx1: DocContext = {
     pdf,
-    page,
-    y,
+    page: page1,
+    y: y1,
     fonts: { reg: fontReg, bold: fontBold },
   }
 
-  for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
-    const [left, right] = pairs[pairIndex]
+  // Dessiner les locataires de la page 1
+  if (page1Locs.length === 1) {
+    await drawSingleCenteredColumnWithBreaks(ctx1, page1Locs[0], 1) // Locataire 1
+  } else if (page1Locs.length === 2) {
+    await drawTwoColumnsAlignedWithBreaks(ctx1, page1Locs[0], page1Locs[1], 1, 2) // Locataires 1 et 2
+  }
 
-    if (right === undefined && left) {
-      await drawSingleCenteredColumnWithBreaks(ctx, left)
-    } else {
-      await drawTwoColumnsAlignedWithBreaks(ctx, left, right)
+  // Sections communes sur la page 1 (après les locataires)
+  await ensureSpace(ctx1, 20) // Réduit de 22 à 20
+  ctx1.page.drawLine({
+    start: { x: MARGIN, y: ctx1.y },
+    end: { x: PAGE_WIDTH - MARGIN, y: ctx1.y },
+    thickness: 1,
+    color: SEP_GRAY,
+  })
+  ctx1.y -= 12 // Réduit de 14 à 12
+
+  // Enfants à charge (sans titre de section)
+  const enfants = (data.nombreEnfantsFoyer ?? 0).toString()
+  await ensureSpace(ctx1, 26) // Réduit de 30 à 26
+  const enfantsText = `Nombre d'enfants à charge : ${enfants}`
+  const enfantsWrapped = wrapByWidth(pdfSafe(enfantsText), fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
+  for (const line of enfantsWrapped) {
+    await ensureSpace(ctx1, LINE_HEIGHT)
+    ctx1.page.drawText(line, { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+    ctx1.y -= LINE_HEIGHT
+  }
+
+  // Garanties
+  await ensureSpace(ctx1, 28) // Réduit de 32 à 28
+  ctx1.y = drawSectionHeader(ctx1.page, "Garanties", MARGIN, ctx1.y, fontBold)
+  const g = data.garanties
+  if (g) {
+    // "Garant familial : Oui/Non"
+    {
+      const txt = pdfSafe(`Garant familial : ${nonEmpty(g.garantFamilial) ? g.garantFamilial : dash}`)
+      const wrapped = wrapByWidth(txt, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
+      for (const line of wrapped) {
+        await ensureSpace(ctx1, LINE_HEIGHT)
+        ctx1.page.drawText(line, { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+        ctx1.y -= LINE_HEIGHT
+      }
     }
 
-    // After tenant columns on this (logical) page, add cross-dossier sections
-    // Separator before dossier-wide sections
-    await ensureSpace(ctx, 22)
-    ctx.page.drawLine({
-      start: { x: MARGIN, y: ctx.y },
-      end: { x: PAGE_WIDTH - MARGIN, y: ctx.y },
-      thickness: 1,
-      color: SEP_GRAY,
-    })
-    ctx.y -= 14
-
-    // Enfants à charge (inline with title)
-    const enfants = (data.nombreEnfantsFoyer ?? 0).toString()
-    await ensureSpace(ctx, 30)
-    ctx.y = drawSectionHeaderWithInlineValue(
-      ctx.page,
-      "Composition du foyer",
-      "Nombre d'enfants à charge",
-      enfants,
-      MARGIN,
-      ctx.y,
-      ctx.fonts,
-    )
-
-    // Garanties
-    await ensureSpace(ctx, 32)
-    ctx.y = drawSectionHeader(ctx.page, "Garanties", MARGIN, ctx.y, fontBold)
-    const g = data.garanties
-    if (g) {
-      // "Garant familial : Oui/Non"
-      {
-        const txt = pdfSafe(`Garant familial : ${nonEmpty(g.garantFamilial) ? g.garantFamilial : dash}`)
-        const wrapped = wrapByWidth(txt, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
-        for (const line of wrapped) {
-          await ensureSpace(ctx, LINE_HEIGHT)
-          ctx.page.drawText(line, { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-          ctx.y -= LINE_HEIGHT
-        }
+    // Précision (long text allowed)
+    {
+      const txt = nonEmpty(g.precisionGarant) ? `Précision : ${g.precisionGarant}` : "Précision : -"
+      const wrapped = wrapByWidth(pdfSafe(txt), fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 12)
+      const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      for (const line of wrapped) {
+        await ensureSpace(ctx1, lh)
+        ctx1.page.drawText(line, { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+        ctx1.y -= lh
       }
+    }
 
-      // Précision (long text allowed)
-      {
-        const txt = nonEmpty(g.precisionGarant) ? `Précision : ${g.precisionGarant}` : "Précision : -"
-        const wrapped = wrapByWidth(pdfSafe(txt), fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 12)
+    // Garantie Visale Oui/Non
+    {
+      const txt = pdfSafe(`Garantie Visale : ${nonEmpty(g.garantieVisale) ? g.garantieVisale : dash}`)
+      const wrapped = wrapByWidth(txt, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
+      for (const line of wrapped) {
+        await ensureSpace(ctx1, LINE_HEIGHT)
+        ctx1.page.drawText(line, { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+        ctx1.y -= LINE_HEIGHT
+      }
+    }
+
+    // Liste des garants en puces (version compacte)
+    if (Array.isArray(g.garants) && g.garants.length) {
+      await ensureSpace(ctx1, LINE_HEIGHT)
+      ctx1.page.drawText(pdfSafe("Garants familiaux déclarés :"), {
+        x: MARGIN,
+        y: ctx1.y,
+        size: BODY_SIZE,
+        font: fontBold,
+        color: BLACK,
+      })
+      ctx1.y -= LINE_HEIGHT
+      for (const ga of g.garants) {
+        const name = [toTitleCase(ga.nom), toTitleCase(ga.prenom)].filter(Boolean).join(" ") || dash
+        const line = `${name}${ga.email ? ` – ${ga.email}` : ""}${ga.telephone ? ` – ${ga.telephone}` : ""}`
+        const wrapped = wrapByWidth(line, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 12)
         const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
-        for (const line of wrapped) {
-          await ensureSpace(ctx, lh)
-          ctx.page.drawText(line, { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-          ctx.y -= lh
+        for (const l of wrapped) {
+          await ensureSpace(ctx1, lh)
+          ctx1.page.drawText(pdfSafe(`• ${l}`), {
+            x: MARGIN + 12,
+            y: ctx1.y,
+            size: BODY_SIZE,
+            font: fontReg,
+            color: BLACK,
+          })
+          ctx1.y -= lh
         }
       }
-
-      // Garantie Visale Oui/Non
-      {
-        const txt = pdfSafe(`Garantie Visale : ${nonEmpty(g.garantieVisale) ? g.garantieVisale : dash}`)
-        const wrapped = wrapByWidth(txt, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
-        for (const line of wrapped) {
-          await ensureSpace(ctx, LINE_HEIGHT)
-          ctx.page.drawText(line, { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-          ctx.y -= LINE_HEIGHT
-        }
-      }
-
-      // Liste des garants en puces
-      if (Array.isArray(g.garants) && g.garants.length) {
-        await ensureSpace(ctx, LINE_HEIGHT)
-        ctx.page.drawText(pdfSafe("Garants familiaux déclarés :"), {
-          x: MARGIN,
-          y: ctx.y,
-          size: BODY_SIZE,
-          font: fontBold,
-          color: BLACK,
-        })
-        ctx.y -= LINE_HEIGHT
-        for (const ga of g.garants) {
-          const name = [toTitleCase(ga.nom), toTitleCase(ga.prenom)].filter(Boolean).join(" ") || dash
-          const line = `${name}${ga.email ? ` – ${ga.email}` : ""}${ga.telephone ? ` – ${ga.telephone}` : ""}`
-          const wrapped = wrapByWidth(line, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 12)
-          const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
-          for (const l of wrapped) {
-            await ensureSpace(ctx, lh)
-            ctx.page.drawText(pdfSafe(`• ${l}`), {
-              x: MARGIN + 12,
-              y: ctx.y,
-              size: BODY_SIZE,
-              font: fontReg,
-              color: BLACK,
-            })
-            ctx.y -= lh
-          }
-        }
-        ctx.y -= 2
-      }
-    } else {
-      await ensureSpace(ctx, LINE_HEIGHT * 3)
-      ctx.page.drawText("Garant familial : -", { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-      ctx.y -= LINE_HEIGHT
-      ctx.page.drawText("Précision : -", { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-      ctx.y -= LINE_HEIGHT
-      ctx.page.drawText("Garantie Visale : -", { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: BLACK })
-      ctx.y -= LINE_HEIGHT
+      ctx1.y -= 1 // Réduit de 2 à 1
     }
+  } else {
+    await ensureSpace(ctx1, LINE_HEIGHT * 3)
+    ctx1.page.drawText("Garant familial : -", { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+    ctx1.y -= LINE_HEIGHT
+    ctx1.page.drawText("Précision : -", { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+    ctx1.y -= LINE_HEIGHT
+    ctx1.page.drawText("Garantie Visale : -", { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+    ctx1.y -= LINE_HEIGHT
+  }
 
-    // Gagnez du temps avec DossierFacile…
-    await ensureSpace(ctx, 32)
-    ctx.y = drawSectionHeader(ctx.page, "Gagnez du temps avec DossierFacile…", MARGIN, ctx.y, fontBold)
+  // DossierFacile (seulement si le locataire transmet son lien)
+  if (data.dossierFacileLink && data.dossierFacileLink.trim()) {
+    await ensureSpace(ctx1, 28) // Réduit de 32 à 28
+    ctx1.y = drawSectionHeader(ctx1.page, "Gagnez du temps avec DossierFacile…", MARGIN, ctx1.y, fontBold)
     const df = pdfSafe((data.dossierFacileLink || "").trim())
-    const dfText = df || "Rien"
-    const dfWrapped = wrapByWidth(dfText, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
+    const dfWrapped = wrapByWidth(df, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN)
     for (const l of dfWrapped) {
-      await ensureSpace(ctx, LINE_HEIGHT)
-      ctx.page.drawText(l, { x: MARGIN, y: ctx.y, size: BODY_SIZE, font: fontReg, color: df ? BLACK : TEXT_INFO })
-      ctx.y -= LINE_HEIGHT
-    }
-
-    // Draw footer and, if another pair follows, start a fresh page with header for next pair (to keep pairs page-separated)
-    drawFooter(ctx.page, fontReg)
-    if (pairIndex < pairs.length - 1) {
-      ctx.page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-      ctx.y = (await drawHeader(ctx.page, pdf, fontBold, fontReg)) - 6
+      await ensureSpace(ctx1, LINE_HEIGHT)
+      ctx1.page.drawText(l, { x: MARGIN, y: ctx1.y, size: BODY_SIZE, font: fontReg, color: BLACK })
+      ctx1.y -= LINE_HEIGHT
     }
   }
 
-  // Ensure footer on last page (if not already recently drawn)
-  // In the loop we drew footer at each pair end, so nothing else is needed here.
+  // Footer sur la page 1
+  drawFooter(ctx1.page, fontReg)
+
+  // Page 2 - Locataires 3-4 (seulement si ils existent)
+  if (page2Locs.length > 0) {
+    const page2 = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    let y2 = await drawHeader(page2, pdf, fontBold, fontReg)
+    y2 -= 4
+
+    const ctx2: DocContext = {
+      pdf,
+      page: page2,
+      y: y2,
+      fonts: { reg: fontReg, bold: fontBold },
+    }
+
+    // Dessiner les locataires de la page 2
+    if (page2Locs.length === 1) {
+      await drawSingleCenteredColumnWithBreaks(ctx2, page2Locs[0], 3) // Locataire 3
+    } else if (page2Locs.length === 2) {
+      await drawTwoColumnsAlignedWithBreaks(ctx2, page2Locs[0], page2Locs[1], 3, 4) // Locataires 3 et 4
+    }
+
+    // Footer sur la page 2
+    drawFooter(ctx2.page, fontReg)
+  }
 
   const bytes = await pdf.save()
   return Buffer.from(bytes)

@@ -79,5 +79,6 @@ export interface AppFormData {
 
 export interface GarantFormData {
   garant: Locataire
-  cautionnes: GarantContact[] // 1 to 4
+  garants?: Locataire[] // Tableau optionnel de garants pour gérer plusieurs garants
+  cautionnes: GarantContact[] // 1 maximum (1 cautionnaire)
 }

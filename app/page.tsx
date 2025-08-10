@@ -4,7 +4,7 @@ import Image from "next/image"
 import { Shield, Building2, HandCoins, Tag, Phone, Mail, MapPin, CheckCircle2, ArrowRight, Star, Clock, Users, Home, Key, Calculator, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/ui/badge"
+import { Badge } from "@/components/ui/badge"
 
 export default function ALVImmobilierHome() {
   return (

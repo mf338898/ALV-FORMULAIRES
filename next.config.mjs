@@ -1,14 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  output: 'export',
+  basePath: process.env.NODE_ENV === 'production' ? '/ALV-FORMULAIRES' : '',
+  trailingSlash: true,
   images: {
-    unoptimized: true,
-  },
-}
+    unoptimized: true
+  }
+};
 
-export default nextConfig
+export default nextConfig;

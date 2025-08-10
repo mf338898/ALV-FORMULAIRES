@@ -13,10 +13,11 @@ function uniqueEmails(emails: (string | null | undefined)[]) {
 
 function resolveRecipientEmail() {
   return (
+    process.env.TEST_EMAIL ||
     process.env.RECIPIENT_EMAIL ||
     process.env.PRIMARY_RECIPIENT_EMAIL || // backward-compat
     process.env.SMTP_RECIPIENT_EMAIL || // backward-compat
-    "contact@alvimmobilier.bzh"
+    "eliottfoveau62@gmail.com"
   )
 }
 
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     // Generate PDF attachment
-    const pdfBuffer = await generateGarantPdf(body, { logoBytes })
+    const pdfBuffer = await generateGarantPdf(body)
     logger.info("PDF Garant généré avec succès")
 
     // Build email routing (simplified spec):
@@ -102,8 +103,8 @@ export async function POST(request: Request) {
     const contact = [normSpace(garant?.email), normSpace((garant as any)?.telephone)].filter(Boolean).join(" / ") || "-"
     parts.push(p(`Contact : ${contact}`))
 
-    // “Se porte garant pour” list
-    const list = (cautionnes || []).slice(0, 4).map((c) => {
+    // "Se porte garant pour" list
+    const list = (cautionnes || []).slice(0, 1).map((c) => {
       const full = personInline((c as any)?.civilite, (c as any)?.nom, (c as any)?.prenom)
       const cLine = [normSpace((c as any)?.email), normSpace((c as any)?.telephone)].filter(Boolean).join(" / ")
       return `${full}${cLine ? ` — ${cLine}` : ""}`

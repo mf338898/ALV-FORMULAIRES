@@ -24,6 +24,7 @@ import { ArrowLeft, ArrowRight, Plus, CheckCircle2, Circle, ListIcon, Trash2, Al
 import { DatePicker } from "@/components/date-picker"
 import type { Locataire, GarantContact, GarantFormData } from "@/lib/types"
 import { SegmentedProgress, type SegmentedStep, CircularStepIndicator } from "@/components/segmented-progress"
+import { StepNavigation } from "@/components/step-navigation"
 import { CityAutocomplete } from "@/components/city-autocomplete"
 import { LoadingOverlay } from "@/components/loading-overlay"
 
@@ -39,7 +40,7 @@ function isNonNegativeIntegerString(v: string) {
   const n = Number(v)
   return Number.isFinite(n) && n >= 0
 }
-const createPerson = (): Locataire => ({
+const createPersonVide = (): Locataire => ({
   nom: "",
   prenom: "",
   civilite: "",
@@ -82,8 +83,16 @@ export default function GarantFormPage() {
   const [maxReachedStep, setMaxReachedStep] = useState(1)
   const [mobileStepsOpen, setMobileStepsOpen] = useState(false)
 
-  const [garant, setGarant] = useState<Locataire>(createPerson())
-  const [cautionnes, setCautionnes] = useState<GarantContact[]>([{ nom: "", prenom: "", email: "", telephone: "" }])
+  // Remplacer l'état unique garant par un tableau de garants
+  const [garants, setGarants] = useState<Locataire[]>([createPersonVide()])
+  const [cautionnes, setCautionnes] = useState<GarantContact[]>([
+    { 
+      nom: "", 
+      prenom: "", 
+      email: "", 
+      telephone: "" 
+    }
+  ])
 
   const [showIdErrors, setShowIdErrors] = useState(false)
   const [showProErrors, setShowProErrors] = useState(false)
@@ -101,8 +110,54 @@ export default function GarantFormPage() {
     { key: "recapitulatif", label: "Récapitulatif", index: 4 },
   ]
 
-  const updateGarant = (field: keyof Locataire, value: string) => {
-    setGarant((prev) => ({ ...prev, [field]: value }))
+  // Validation en temps réel pour les champs critiques
+  const validateFieldInRealTime = (field: string, value: string) => {
+    switch (field) {
+      case 'email':
+        if (value && !isValidEmail(value)) {
+          return "Format d'email invalide"
+        }
+        break
+      case 'telephone':
+        if (value && !isValidPhoneDigits(value, 10)) {
+          return "Le téléphone doit contenir au moins 10 chiffres"
+        }
+        break
+      case 'salaire':
+        if (value && !isNonNegativeIntegerString(value)) {
+          return "Le salaire doit être un nombre positif"
+        }
+        break
+      case 'employeurTelephone':
+        if (value && !isValidPhoneDigits(value, 10)) {
+          return "Le téléphone employeur doit contenir au moins 10 chiffres"
+        }
+        break
+    }
+    return null
+  }
+
+  // Fonction pour mettre à jour un garant spécifique
+  const updateGarant = (index: number, field: keyof Locataire, value: string) => {
+    setGarants((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], [field]: value }
+      return next
+    })
+  }
+
+  // Fonction pour ajouter un nouveau garant
+  const addGarant = () => {
+    if (garants.length >= 2) return // Maximum 2 garants
+    const nouveauGarant = createPersonVide()
+    setGarants((prev) => [...prev, nouveauGarant])
+  }
+
+  // Fonction pour supprimer un garant
+  const removeGarant = (index: number) => {
+    if (garants.length > 1) { // Garder au moins 1 garant
+      setGarants((prev) => prev.filter((_, i) => i !== index))
+    }
   }
 
   const updateCautionne = (i: number, field: keyof GarantContact, value: string) => {
@@ -114,8 +169,10 @@ export default function GarantFormPage() {
   }
 
   const addCautionne = () => {
-    if (cautionnes.length >= 4) return
-    setCautionnes((prev) => [...prev, { nom: "", prenom: "", email: "", telephone: "" }])
+    if (cautionnes.length >= 1) return // Maximum 1 cautionnaire
+    // Ajouter un cautionné avec des données de test
+    const nouveauCautionne = { nom: "", prenom: "", email: "", telephone: "" }
+    setCautionnes((prev) => [...prev, nouveauCautionne])
   }
 
   const removeCautionne = (idx: number) => {
@@ -138,8 +195,24 @@ export default function GarantFormPage() {
   const isCautionneValid = (c: GarantContact) =>
     !isEmpty(c.nom) && !isEmpty(c.prenom) && isValidEmail(c.email || "") && isValidPhoneDigits(c.telephone || "", 10)
 
+  // Validation pour tous les garants
+  const validateGarants = () => {
+    return garants.every(garant => {
+      const basicInfo = !isEmpty(garant.prenom) && 
+                       !isEmpty(garant.nom) && 
+                       !isEmpty(garant.email) && 
+                       !isEmpty(garant.telephone)
+      const emailOk = isValidEmail(garant.email || "")
+      const phoneOk = isValidPhoneDigits(garant.telephone || "", 10)
+      return basicInfo && emailOk && phoneOk
+    })
+  }
+
   const validateIdentite = () => {
-    const G = garant
+    // Vérifier que tous les garants ont les informations d'identité de base
+    if (!validateGarants()) return false
+    
+    const G = garants[0]
     const requiredOk =
       !isEmpty(G.civilite) &&
       !isEmpty(G.prenom) &&
@@ -158,7 +231,7 @@ export default function GarantFormPage() {
 
   type ProErrors = Record<string, boolean>
   const getProErrors = (): ProErrors => {
-    const G = garant
+    const G = garants[0]
     const errors: ProErrors = {}
     const requireNonNegativeSalary = (flag: boolean) => {
       if (flag && !isNonNegativeIntegerString(G.salaire)) errors.salaire = true
@@ -261,38 +334,109 @@ export default function GarantFormPage() {
 
   const isStepValid = (() => {
     if (etape === 1) {
-      return cautionnes.length >= 1 && cautionnes.every(isCautionneValid)
+      return validateGarants() && cautionnes.length >= 1 && cautionnes.every(isCautionneValid)
     }
     if (etape === 2) return validateIdentite()
     if (etape === 3) return Object.keys(getProErrors()).length === 0
     return true
-  })()
+  })
 
   const canLeaveCurrentStep = () => {
     setErrorMsg(null)
     if (etape === 1) {
+      // Vérifier d'abord les garants
+      if (!validateGarants()) {
+        setErrorMsg("Veuillez compléter les informations de base pour tous les garants (prénom, nom, email, téléphone).")
+        toast.error("Veuillez compléter les informations de base pour tous les garants.")
+        return false
+      }
+      
+      // Puis vérifier les cautionnés
       if (cautionnes.length < 1 || !cautionnes.every(isCautionneValid)) {
         setShowCautionnesErrors(true)
-        setErrorMsg("Veuillez renseigner au moins un locataire, avec nom, prénom, e‑mail et téléphone valides.")
-        toast.error("Informations locataire(s) incomplètes.")
+        
+        // Message d'erreur plus détaillé pour les cautionnés
+        if (cautionnes.length < 1) {
+          setErrorMsg("Veuillez renseigner au moins un locataire.")
+          toast.error("Veuillez renseigner au moins un locataire.")
+          return false
+        }
+        
+        const invalidCautionnes = cautionnes.filter(c => !isCautionneValid(c))
+        const missingFields: string[] = []
+        invalidCautionnes.forEach((c, idx) => {
+          if (isEmpty(c.nom)) missingFields.push(`nom du locataire ${idx + 1}`)
+          if (isEmpty(c.prenom)) missingFields.push(`prénom du locataire ${idx + 1}`)
+          if (isEmpty(c.email)) missingFields.push(`email du locataire ${idx + 1}`)
+          if (isEmpty(c.telephone)) missingFields.push(`téléphone du locataire ${idx + 1}`)
+        })
+        
+        const message = `Champs manquants : ${missingFields.join(", ")}. Veuillez compléter toutes les informations des locataires.`
+        setErrorMsg(message)
+        toast.error(message)
         return false
       }
       return true
     }
+    
     if (etape === 2) {
       if (!validateIdentite()) {
         setShowIdErrors(true)
-        setErrorMsg("Complétez les champs d’identité obligatoires.")
-        toast.error("Identité incomplète.")
+        
+        // Message d'erreur plus détaillé pour l'identité
+        const missingFields: string[] = []
+        if (isEmpty(garants[0].civilite)) missingFields.push("civilité")
+        if (isEmpty(garants[0].prenom)) missingFields.push("prénom")
+        if (isEmpty(garants[0].nom)) missingFields.push("nom")
+        if (isEmpty(garants[0].email)) missingFields.push("email")
+        if (isEmpty(garants[0].telephone)) missingFields.push("téléphone")
+        if (isEmpty(garants[0].adresseActuelle)) missingFields.push("adresse actuelle")
+        if (isEmpty(garants[0].situationConjugale)) missingFields.push("situation conjugale")
+        if (isEmpty(garants[0].situationActuelle)) missingFields.push("situation actuelle")
+        if (isEmpty(garants[0].dateNaissance)) missingFields.push("date de naissance")
+        if (isEmpty(garants[0].lieuNaissance)) missingFields.push("lieu de naissance")
+        
+        const message = `Champs d'identité manquants : ${missingFields.join(", ")}. Veuillez compléter toutes les informations.`
+        setErrorMsg(message)
+        toast.error(message)
         return false
       }
       return true
     }
+    
     if (etape === 3) {
       if (Object.keys(getProErrors()).length > 0) {
         setShowProErrors(true)
-        setErrorMsg("Complétez les champs professionnels obligatoires.")
-        toast.error("Situation professionnelle incomplète.")
+        
+        // Message d'erreur plus détaillé pour la situation professionnelle
+        const proErrors = getProErrors()
+        const missingFields = Object.keys(proErrors).map(key => {
+          switch(key) {
+            case 'employeurNom': return 'nom de l\'employeur'
+            case 'profession': return 'profession'
+            case 'employeurAdresse': return 'adresse de l\'employeur'
+            case 'dateEmbauche': return 'date d\'embauche'
+            case 'dateFinContrat': return 'date de fin de contrat'
+            case 'agenceInterim': return 'agence d\'intérim'
+            case 'dureeInscriptionInterim': return 'durée d\'inscription intérim'
+            case 'regimeRetraite': return 'régime de retraite'
+            case 'dateDebutRetraite': return 'date de début de retraite'
+            case 'etablissementFormation': return 'établissement de formation'
+            case 'alternance': return 'alternance'
+            case 'typeAlternance': return 'type d\'alternance'
+            case 'dateDebutActivite': return 'date de début d\'activité'
+            case 'situationActuelleSansEmploi': return 'situation actuelle'
+            case 'origineRevenuPrincipal': return 'origine du revenu principal'
+            case 'origineRevenuPrincipalAutre': return 'précision origine revenu'
+            case 'salaire': return 'salaire'
+            case 'employeurTelephone': return 'téléphone employeur'
+            default: return key
+          }
+        })
+        
+        const message = `Champs professionnels manquants : ${missingFields.join(", ")}. Veuillez compléter toutes les informations professionnelles.`
+        setErrorMsg(message)
+        toast.error(message)
         return false
       }
       return true
@@ -332,7 +476,11 @@ export default function GarantFormPage() {
     setShowConfirmDialog(false)
     toast.info("Envoi de votre fiche garant...")
     try {
-      const payload: GarantFormData = { garant, cautionnes }
+      const payload: GarantFormData = { 
+        garant: garants[0], // Premier garant pour la compatibilité
+        garants, // Tableau complet de garants
+        cautionnes 
+      }
       const res = await fetch("/api/generer-pdf-garant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -341,7 +489,7 @@ export default function GarantFormPage() {
       const json = await res.json()
       if (res.ok && json.success) {
         toast.success(json.message || "Fiche garant envoyée.")
-        router.push("/locataire/confirmation?email=" + encodeURIComponent(garant.email || ""))
+        router.push("/locataire/confirmation?email=" + encodeURIComponent(garants[0].email || ""))
       } else {
         toast.error(json.message || "Une erreur est survenue.", {
           description: json.error || "Veuillez réessayer ultérieurement.",
@@ -365,13 +513,59 @@ export default function GarantFormPage() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
       <LoadingOverlay show={isSubmitting} message="Veuillez patienter… Votre fiche garant est en cours de traitement" />
+      
+      {/* Main Header with back button and title */}
+      <div className="mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 bg-gradient-to-r from-orange-50 via-white to-amber-50 rounded-2xl border border-orange-100 shadow-sm">
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl shadow-lg">
+                <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-amber-700 bg-clip-text text-transparent">
+                  Fiche Garant
+                </h1>
+                <p className="text-slate-600 text-sm mt-1">
+                  Formulaire de cautionnement - ALV Immobilier
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/")}
+            className="group flex items-center gap-3 px-6 py-3 bg-white hover:bg-orange-50 border border-orange-200 hover:border-orange-300 text-orange-700 hover:text-orange-800 shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
+          >
+            <div className="p-1.5 bg-orange-100 group-hover:bg-orange-200 rounded-lg transition-colors">
+              <svg className="h-4 w-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+              </svg>
+            </div>
+            <span className="font-semibold">Retour à l'accueil</span>
+          </Button>
+        </div>
+      </div>
+      
       {/* Mobile sticky header */}
-      <div className="md:hidden sticky top-0 z-30 -mt-8 mb-4 bg-white/80 backdrop-blur border-b px-4 py-2">
-        <div className="flex items-center gap-3">
-          <CircularStepIndicator current={etape} total={totalEtapes} />
-          <p className="text-xs text-slate-600">
-            Étape {etape} sur {totalEtapes} : <span className="font-medium text-slate-800">{currentTitle}</span>
-          </p>
+      <div className="md:hidden sticky top-0 z-30 -mt-8 mb-4 bg-white/90 backdrop-blur-md border-b border-slate-200/60 shadow-sm px-4 py-3">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <CircularStepIndicator current={etape} total={totalEtapes} />
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-600 rounded-full flex items-center justify-center">
+              <span className="text-[8px] text-white font-bold">{etape}</span>
+            </div>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-800">
+              Étape {etape} sur {totalEtapes}
+            </p>
+            <p className="text-xs text-slate-600">
+              {currentTitle}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -385,7 +579,7 @@ export default function GarantFormPage() {
             title={currentTitle}
             onSelect={(idx) => {
               if (idx > maxReachedStep) {
-                toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                 return
               }
               goToStep(idx)
@@ -395,16 +589,17 @@ export default function GarantFormPage() {
         <div className="md:hidden">
           <Sheet open={mobileStepsOpen} onOpenChange={setMobileStepsOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                <ListIcon className="h-4 w-4" />
-                Étapes
+              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border-slate-200 hover:bg-white hover:border-slate-300 shadow-sm">
+                <ListIcon className="h-4 w-4 text-slate-600" />
+                <span className="text-slate-700 font-medium">Étapes</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[85%] sm:w-[380px]">
-              <SheetHeader>
-                <SheetTitle>Étapes de la fiche garant</SheetTitle>
+            <SheetContent side="left" className="w-[85%] sm:w-[380px] bg-gradient-to-br from-slate-50 to-white">
+              <SheetHeader className="border-b border-slate-200 pb-4">
+                <SheetTitle className="text-xl font-bold text-slate-800">Étapes de la fiche garant</SheetTitle>
+                <p className="text-sm text-slate-600 mt-1">Progression : {etape} sur {totalEtapes}</p>
               </SheetHeader>
-              <nav aria-label="Étapes (mobile)" className="mt-4 space-y-2">
+              <nav aria-label="Étapes (mobile)" className="mt-6 space-y-3">
                 {steps.map((s) => {
                   const completed = s.index < etape
                   const current = s.index === etape
@@ -414,7 +609,7 @@ export default function GarantFormPage() {
                       key={s.key}
                       onClick={() => {
                         if (disabled) {
-                          toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                          toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                           return
                         }
                         goToStep(s.index)
@@ -422,22 +617,36 @@ export default function GarantFormPage() {
                       }}
                       aria-disabled={disabled}
                       className={cn(
-                        "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                        completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                        current && "bg-blue-50 border-blue-200 text-blue-800",
+                        "w-full text-left flex items-center gap-4 rounded-xl border px-4 py-3 transition-all duration-300",
+                        "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                        disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                        completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                        current && "bg-gradient-to-r from-orange-50 to-orange-100 border-orange-300 text-orange-800 shadow-md ring-2 ring-orange-200",
                         !completed &&
                           !current &&
                           !disabled &&
-                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                          "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                       )}
                     >
-                      {completed ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                      ) : (
-                        <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                      )}
-                      <span className="text-sm font-medium">{s.label}</span>
+                      <div className={cn(
+                        "p-2 rounded-lg transition-all duration-300",
+                        completed && "bg-emerald-100 text-emerald-700",
+                        current && "bg-orange-100 text-orange-700",
+                        !completed && !current && !disabled && "bg-slate-100 text-slate-600",
+                        disabled && "bg-slate-50 text-slate-400"
+                      )}>
+                        {completed ? (
+                          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                          <Circle className="h-4 w-4" aria-hidden="true" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <span className="text-sm font-medium block">{s.label}</span>
+                        {current && (
+                          <span className="text-xs text-orange-600 font-medium">En cours</span>
+                        )}
+                      </div>
                     </button>
                   )
                 })}
@@ -449,13 +658,17 @@ export default function GarantFormPage() {
 
       <div className="grid gap-6 md:grid-cols-12">
         <aside className="md:col-span-4 lg:col-span-3 hidden md:block">
-          <nav aria-label="Étapes" className="space-y-3">
-            <Accordion type="multiple" defaultValue={["bloc"]} className="space-y-2">
-              <AccordionItem value="bloc" className="border rounded-md bg-white">
+          <nav aria-label="Étapes" className="space-y-4">
+            <div className="px-3 py-2">
+              <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">Fiche Garant</h3>
+              <p className="text-xs text-slate-500 mt-1">Progression du formulaire</p>
+            </div>
+            <Accordion type="multiple" defaultValue={["bloc"]} className="space-y-3">
+              <AccordionItem value="bloc" className="border rounded-lg bg-white shadow-sm">
                 <AccordionTrigger className="px-3 py-2 hover:no-underline">
-                  <span className="text-sm font-semibold">Fiche Garant</span>
+                  <span className="text-sm font-semibold">Étapes</span>
                 </AccordionTrigger>
-                <AccordionContent className="px-3 pb-3 pt-0 space-y-2">
+                <AccordionContent className="px-3 pb-3 pt-0 space-y-3">
                   {steps.map((s) => {
                     const completed = s.index < etape
                     const current = s.index === etape
@@ -465,29 +678,43 @@ export default function GarantFormPage() {
                         key={s.key}
                         onClick={() => {
                           if (disabled) {
-                            toast.info("Veuillez terminer l’étape en cours avant d’accéder à la suivante.")
+                            toast.info("Veuillez terminer l'étape en cours avant d'accéder à la suivante.")
                             return
                           }
                           goToStep(s.index)
                         }}
                         aria-disabled={disabled}
                         className={cn(
-                          "w-full text-left flex items-center gap-3 rounded-md border px-3 py-2 transition",
-                          disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed",
-                          completed && "bg-emerald-50 border-emerald-200 text-emerald-800",
-                          current && "bg-blue-50 border-blue-200 text-blue-800",
+                          "w-full text-left flex items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-300 group",
+                          "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                          disabled && "opacity-50 cursor-not-allowed hover:cursor-not-allowed hover:scale-100",
+                          completed && "bg-gradient-to-r from-emerald-50 to-emerald-100 border-emerald-200 text-emerald-800 shadow-sm",
+                          current && "bg-gradient-to-r from-orange-50 to-orange-100 border-orange-300 text-orange-800 shadow-md ring-2 ring-orange-200",
                           !completed &&
                             !current &&
                             !disabled &&
-                            "bg-white hover:bg-slate-50 border-slate-200 text-slate-700",
+                            "bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300",
                         )}
                       >
-                        {completed ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
-                        ) : (
-                          <Circle className="h-4 w-4 text-slate-400" aria-hidden="true" />
-                        )}
-                        <span className="text-sm font-medium">{s.label}</span>
+                        <div className={cn(
+                          "p-2 rounded-lg transition-all duration-300",
+                          completed && "bg-emerald-100 text-emerald-700",
+                          current && "bg-orange-100 text-orange-700",
+                          !completed && !current && !disabled && "bg-slate-100 text-slate-600",
+                          disabled && "bg-slate-50 text-slate-400"
+                        )}>
+                          {completed ? (
+                            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                          ) : (
+                            <Circle className="h-4 w-4" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium block">{s.label}</span>
+                          {current && (
+                            <span className="text-xs text-orange-600 font-medium">En cours</span>
+                          )}
+                        </div>
                       </button>
                     )
                   })}
@@ -506,17 +733,122 @@ export default function GarantFormPage() {
             <CardContent className="space-y-6">
               {/* Step 1: Cautionnés */}
               {etape === 1 && (
-                <div className="space-y-4">
-                  <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded-r-lg">
-                    <div className="flex items-start gap-3">
-                      <Info className="h-5 w-5 text-blue-500 mt-0.5" />
-                      <div className="text-sm">
-                        Indiquez le(s) locataire(s) pour lequel(s) vous vous portez caution (jusqu’à 4).
+                <div className="space-y-6">
+                  {/* Section Garants */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-800">Garant(s)</h3>
+                      <Button
+                        type="button"
+                        onClick={addGarant}
+                        disabled={garants.length >= 2}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        size="sm"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Ajouter un garant
+                      </Button>
+                    </div>
+                    
+                    <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded-r-lg">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+                        <div className="text-sm">
+                          Vous pouvez ajouter jusqu'à 2 garants. Le premier garant sera le garant principal.
+                        </div>
                       </div>
                     </div>
+
+                    {garants.map((garant, idx) => (
+                      <div key={idx} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-slate-700">
+                            {idx === 0 ? "Garant principal" : `Garant ${idx + 1}`}
+                          </p>
+                          {garants.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeGarant(idx)}
+                              className="h-8 w-8 text-red-500 hover:text-red-600"
+                              aria-label={`Supprimer garant ${idx + 1}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>
+                              Prénom <span className="text-red-600">*</span>
+                            </Label>
+                            <Input
+                              value={garant.prenom}
+                              onChange={(e) => updateGarant(idx, "prenom", e.target.value)}
+                              className="mt-1"
+                              maxLength={50}
+                            />
+                          </div>
+                          <div>
+                            <Label>
+                              Nom <span className="text-red-600">*</span>
+                            </Label>
+                            <Input
+                              value={garant.nom}
+                              onChange={(e) => updateGarant(idx, "nom", e.target.value)}
+                              className="mt-1"
+                              maxLength={50}
+                            />
+                          </div>
+                          <div>
+                            <Label>
+                              E‑mail <span className="text-red-600">*</span>
+                            </Label>
+                            <Input
+                              type="email"
+                              value={garant.email}
+                              onChange={(e) => updateGarant(idx, "email", e.target.value)}
+                              className="mt-1"
+                              maxLength={80}
+                            />
+                          </div>
+                          <div>
+                            <Label>
+                              Téléphone <span className="text-red-600">*</span>
+                            </Label>
+                            <Input
+                              type="tel"
+                              value={garant.telephone}
+                              onChange={(e) =>
+                                handleNumericInputChange(e, (val) => updateGarant(idx, "telephone", val), true)
+                              }
+                              placeholder="06 12 34 56 78"
+                              className="mt-1"
+                              maxLength={15}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
+                  {/* Section Cautionnés */}
                   <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-gray-800">Locataire cautionné</h3>
+                    </div>
+
+                    <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-800 rounded-r-lg">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+                        <div className="text-sm">
+                          Indiquez le locataire pour lequel vous vous portez caution (1 maximum).
+                        </div>
+                      </div>
+                    </div>
+
                     {cautionnes.map((c, idx) => {
                       const invalidNom = showCautionnesErrors && c.nom.trim() === ""
                       const invalidPrenom = showCautionnesErrors && c.prenom.trim() === ""
@@ -525,7 +857,7 @@ export default function GarantFormPage() {
                       return (
                         <div key={idx} className="p-4 border rounded-lg space-y-3">
                           <div className="flex items-center justify-between">
-                            <p className="font-medium text-slate-700">Locataire {idx + 1}</p>
+                            <p className="font-medium text-slate-700">Cautionnaire {idx + 1}</p>
                             {cautionnes.length > 1 && (
                               <Button
                                 type="button"
@@ -533,7 +865,7 @@ export default function GarantFormPage() {
                                 size="icon"
                                 onClick={() => removeCautionne(idx)}
                                 className="h-8 w-8 text-red-500 hover:text-red-600"
-                                aria-label={`Supprimer locataire ${idx + 1}`}
+                                aria-label={`Supprimer cautionnaire ${idx + 1}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -604,20 +936,6 @@ export default function GarantFormPage() {
                       )
                     })}
                   </div>
-
-                  <div className="flex justify-between">
-                    <div />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={addCautionne}
-                      disabled={cautionnes.length >= 4}
-                      className="bg-transparent"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ajouter un locataire
-                    </Button>
-                  </div>
                 </div>
               )}
 
@@ -629,9 +947,9 @@ export default function GarantFormPage() {
                       <Label>
                         Civilité <span className="text-red-600">*</span>
                       </Label>
-                      <Select value={garant.civilite} onValueChange={(v) => updateGarant("civilite", v)}>
+                      <Select value={garants[0].civilite} onValueChange={(v) => updateGarant(0, "civilite", v)}>
                         <SelectTrigger
-                          className={cn("mt-1", showIdErrors && !garant.civilite && "border-red-500 bg-red-50")}
+                          className={cn("mt-1", showIdErrors && !garants[0].civilite && "border-red-500 bg-red-50")}
                         >
                           <SelectValue placeholder="Sélectionner" />
                         </SelectTrigger>
@@ -640,7 +958,7 @@ export default function GarantFormPage() {
                           <SelectItem value="madame">Madame</SelectItem>
                         </SelectContent>
                       </Select>
-                      {showIdErrors && !garant.civilite && (
+                      {showIdErrors && !garants[0].civilite && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -650,24 +968,24 @@ export default function GarantFormPage() {
                         Prénom <span className="text-red-600">*</span>
                       </Label>
                       <Input
-                        value={garant.prenom}
-                        onChange={(e) => updateGarant("prenom", e.target.value)}
-                        className={cn("mt-1", showIdErrors && !garant.prenom && "border-red-500 bg-red-50")}
+                        value={garants[0].prenom}
+                        onChange={(e) => updateGarant(0, "prenom", e.target.value)}
+                        className={cn("mt-1", showIdErrors && !garants[0].prenom && "border-red-500 bg-red-50")}
                         maxLength={50}
                       />
-                      {showIdErrors && !garant.prenom && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
+                      {showIdErrors && !garants[0].prenom && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
                     </div>
                     <div>
                       <Label>
                         Nom <span className="text-red-600">*</span>
                       </Label>
                       <Input
-                        value={garant.nom}
-                        onChange={(e) => updateGarant("nom", e.target.value)}
-                        className={cn("mt-1", showIdErrors && !garant.nom && "border-red-500 bg-red-50")}
+                        value={garants[0].nom}
+                        onChange={(e) => updateGarant(0, "nom", e.target.value)}
+                        className={cn("mt-1", showIdErrors && !garants[0].nom && "border-red-500 bg-red-50")}
                         maxLength={50}
                       />
-                      {showIdErrors && !garant.nom && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
+                      {showIdErrors && !garants[0].nom && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
                     </div>
                     <div>
                       <Label>
@@ -675,18 +993,18 @@ export default function GarantFormPage() {
                       </Label>
                       <Input
                         type="email"
-                        value={garant.email}
-                        onChange={(e) => updateGarant("email", e.target.value)}
+                        value={garants[0].email}
+                        onChange={(e) => updateGarant(0, "email", e.target.value)}
                         className={cn(
                           "mt-1",
-                          (showIdErrors && !garant.email) || (garant.email && !isValidEmail(garant.email))
+                          (showIdErrors && !garants[0].email) || (garants[0].email && !isValidEmail(garants[0].email))
                             ? "border-red-500 bg-red-50"
                             : "",
                         )}
                         maxLength={80}
                       />
-                      {showIdErrors && !garant.email && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
-                      {garant.email && !isValidEmail(garant.email) && (
+                      {showIdErrors && !garants[0].email && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
+                      {garants[0].email && !isValidEmail(garants[0].email) && (
                         <p className="text-xs text-red-600 mt-1">Adresse e‑mail invalide</p>
                       )}
                     </div>
@@ -696,22 +1014,22 @@ export default function GarantFormPage() {
                       </Label>
                       <Input
                         type="tel"
-                        value={garant.telephone}
-                        onChange={(e) => handleNumericInputChange(e, (val) => updateGarant("telephone", val), true)}
+                        value={garants[0].telephone}
+                        onChange={(e) => handleNumericInputChange(e, (val) => updateGarant(0, "telephone", val), true)}
                         placeholder="06 12 34 56 78"
                         className={cn(
                           "mt-1",
-                          (showIdErrors && !garant.telephone) ||
-                            (garant.telephone && !isValidPhoneDigits(garant.telephone, 10))
+                          (showIdErrors && !garants[0].telephone) ||
+                            (garants[0].telephone && !isValidPhoneDigits(garants[0].telephone, 10))
                             ? "border-red-500 bg-red-50"
                             : "",
                         )}
                         maxLength={15}
                       />
-                      {showIdErrors && !garant.telephone && (
+                      {showIdErrors && !garants[0].telephone && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
-                      {garant.telephone && !isValidPhoneDigits(garant.telephone, 10) && (
+                      {garants[0].telephone && !isValidPhoneDigits(garants[0].telephone, 10) && (
                         <p className="text-xs text-red-600 mt-1">Numéro invalide (10 chiffres requis)</p>
                       )}
                     </div>
@@ -721,17 +1039,17 @@ export default function GarantFormPage() {
                       </Label>
                       <DatePicker
                         id="dateNaissance-garant"
-                        value={garant.dateNaissance}
-                        onChange={(iso) => updateGarant("dateNaissance", iso)}
+                        value={garants[0].dateNaissance}
+                        onChange={(iso) => updateGarant(0, "dateNaissance", iso)}
                         fromYear={1900}
                         toYear={new Date().getFullYear()}
                         disableFuture
                         ariaLabel="Sélectionner la date de naissance"
-                        className={cn("mt-1", showIdErrors && !garant.dateNaissance && "ring-1 ring-red-500 rounded")}
+                        className={cn("mt-1", showIdErrors && !garants[0].dateNaissance && "ring-1 ring-red-500 rounded")}
                         placeholder="jj/mm/aaaa"
                         displayFormat="dd/MM/yyyy"
                       />
-                      {showIdErrors && !garant.dateNaissance && (
+                      {showIdErrors && !garants[0].dateNaissance && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -741,13 +1059,13 @@ export default function GarantFormPage() {
                       </Label>
                       <CityAutocomplete
                         id="lieuNaissance-garant"
-                        value={garant.lieuNaissance}
-                        onChange={(val) => updateGarant("lieuNaissance", val)}
+                        value={garants[0].lieuNaissance}
+                        onChange={(val) => updateGarant(0, "lieuNaissance", val)}
                         placeholder="Tapez une ville (ex: Brest) + code postal"
-                        className={cn("mt-1", showIdErrors && !garant.lieuNaissance && "border-red-500 bg-red-50")}
-                        ariaInvalid={showIdErrors && !garant.lieuNaissance}
+                        className={cn("mt-1", showIdErrors && !garants[0].lieuNaissance && "border-red-500 bg-red-50")}
+                        ariaInvalid={showIdErrors && !garants[0].lieuNaissance}
                       />
-                      {showIdErrors && !garant.lieuNaissance && (
+                      {showIdErrors && !garants[0].lieuNaissance && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -756,12 +1074,12 @@ export default function GarantFormPage() {
                         Adresse actuelle <span className="text-red-600">*</span>
                       </Label>
                       <Input
-                        value={garant.adresseActuelle}
-                        onChange={(e) => updateGarant("adresseActuelle", e.target.value)}
-                        className={cn("mt-1", showIdErrors && !garant.adresseActuelle && "border-red-500 bg-red-50")}
+                        value={garants[0].adresseActuelle}
+                        onChange={(e) => updateGarant(0, "adresseActuelle", e.target.value)}
+                        className={cn("mt-1", showIdErrors && !garants[0].adresseActuelle && "border-red-500 bg-red-50")}
                         maxLength={120}
                       />
-                      {showIdErrors && !garant.adresseActuelle && (
+                      {showIdErrors && !garants[0].adresseActuelle && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -770,13 +1088,13 @@ export default function GarantFormPage() {
                         Situation conjugale <span className="text-red-600">*</span>
                       </Label>
                       <Select
-                        value={garant.situationConjugale}
-                        onValueChange={(v) => updateGarant("situationConjugale", v)}
+                        value={garants[0].situationConjugale}
+                        onValueChange={(v) => updateGarant(0, "situationConjugale", v)}
                       >
                         <SelectTrigger
                           className={cn(
                             "mt-1",
-                            showIdErrors && !garant.situationConjugale && "border-red-500 bg-red-50",
+                            showIdErrors && !garants[0].situationConjugale && "border-red-500 bg-red-50",
                           )}
                         >
                           <SelectValue placeholder="Sélectionner" />
@@ -790,7 +1108,7 @@ export default function GarantFormPage() {
                           <SelectItem value="veuf">Veuf/Veuve</SelectItem>
                         </SelectContent>
                       </Select>
-                      {showIdErrors && !garant.situationConjugale && (
+                      {showIdErrors && !garants[0].situationConjugale && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -799,13 +1117,13 @@ export default function GarantFormPage() {
                         Statut logement actuel <span className="text-red-600">*</span>
                       </Label>
                       <Select
-                        value={garant.situationActuelle}
-                        onValueChange={(v) => updateGarant("situationActuelle", v)}
+                        value={garants[0].situationActuelle}
+                        onValueChange={(v) => updateGarant(0, "situationActuelle", v)}
                       >
                         <SelectTrigger
                           className={cn(
                             "mt-1",
-                            showIdErrors && !garant.situationActuelle && "border-red-500 bg-red-50",
+                            showIdErrors && !garants[0].situationActuelle && "border-red-500 bg-red-50",
                           )}
                         >
                           <SelectValue placeholder="Sélectionner" />
@@ -818,7 +1136,7 @@ export default function GarantFormPage() {
                           <SelectItem value="sans_logement">Sans logement fixe</SelectItem>
                         </SelectContent>
                       </Select>
-                      {showIdErrors && !garant.situationActuelle && (
+                      {showIdErrors && !garants[0].situationActuelle && (
                         <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                       )}
                     </div>
@@ -833,7 +1151,7 @@ export default function GarantFormPage() {
                     <Label>
                       Sélectionner votre situation professionnelle <span className="text-red-600">*</span>
                     </Label>
-                    <Select value={garant.typeContrat} onValueChange={(v) => updateGarant("typeContrat", v)}>
+                    <Select value={garants[0].typeContrat} onValueChange={(v) => updateGarant(0, "typeContrat", v)}>
                       <SelectTrigger className={cn(showPro && proErr.typeContrat && "border-red-500 bg-red-50")}>
                         <SelectValue placeholder="Sélectionner..." />
                       </SelectTrigger>
@@ -852,15 +1170,15 @@ export default function GarantFormPage() {
                   </div>
 
                   {/* For each type, mirror the same structure as the locataire pro section (required) */}
-                  {garant.typeContrat === "cdi" && (
+                  {garants[0].typeContrat === "cdi" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
-                          Nom de l’entreprise / administration <span className="text-red-600">*</span>
+                          Nom de l'entreprise / administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurNom}
-                          onChange={(e) => updateGarant("employeurNom", e.target.value)}
+                          value={garants[0].employeurNom}
+                          onChange={(e) => updateGarant(0, "employeurNom", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurNom && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -873,8 +1191,8 @@ export default function GarantFormPage() {
                           Profession / poste occupé <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.profession}
-                          onChange={(e) => updateGarant("profession", e.target.value)}
+                          value={garants[0].profession}
+                          onChange={(e) => updateGarant(0, "profession", e.target.value)}
                           className={cn("mt-1", showPro && proErr.profession && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -882,11 +1200,11 @@ export default function GarantFormPage() {
                       </div>
                       <div className="md:col-span-2">
                         <Label>
-                          Adresse de l’entreprise / administration <span className="text-red-600">*</span>
+                          Adresse de l'entreprise / administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurAdresse}
-                          onChange={(e) => updateGarant("employeurAdresse", e.target.value)}
+                          value={garants[0].employeurAdresse}
+                          onChange={(e) => updateGarant(0, "employeurAdresse", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurAdresse && "border-red-500 bg-red-50")}
                           maxLength={120}
                         />
@@ -896,13 +1214,13 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                          Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                         </Label>
                         <Input
                           type="tel"
-                          value={garant.employeurTelephone}
+                          value={garants[0].employeurTelephone}
                           onChange={(e) =>
-                            handleNumericInputChange(e, (val) => updateGarant("employeurTelephone", val), true)
+                            handleNumericInputChange(e, (val) => updateGarant(0, "employeurTelephone", val), true)
                           }
                           placeholder="01 23 45 67 89"
                           className={cn("mt-1", showPro && proErr.employeurTelephone && "border-red-500 bg-red-50")}
@@ -914,12 +1232,12 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Date d’embauche <span className="text-red-600">*</span>
+                          Date d'embauche <span className="text-red-600">*</span>
                         </Label>
                         <DatePicker
                           id="date-embauche-garant"
-                          value={garant.dateEmbauche}
-                          onChange={(iso) => updateGarant("dateEmbauche", iso)}
+                          value={garants[0].dateEmbauche}
+                          onChange={(iso) => updateGarant(0, "dateEmbauche", iso)}
                           fromYear={1990}
                           toYear={new Date().getFullYear() + 1}
                           ariaLabel="Sélectionner la date d'embauche"
@@ -937,10 +1255,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -955,15 +1273,15 @@ export default function GarantFormPage() {
                   {/* Mirror other contract types similar to the locataire form (CDD, interim, fonctionnaire, freelance, retraite, etudiant[+alternance], sans_emploi) */}
                   {/* For brevity in this UI block, we've implemented the pattern for each branch similarly to the locataire form above. */}
                   {/* CDD */}
-                  {garant.typeContrat === "cdd" && (
+                  {garants[0].typeContrat === "cdd" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
-                          Nom de l’entreprise / administration <span className="text-red-600">*</span>
+                          Nom de l'entreprise / administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurNom}
-                          onChange={(e) => updateGarant("employeurNom", e.target.value)}
+                          value={garants[0].employeurNom}
+                          onChange={(e) => updateGarant(0, "employeurNom", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurNom && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -976,8 +1294,8 @@ export default function GarantFormPage() {
                           Profession / poste occupé <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.profession}
-                          onChange={(e) => updateGarant("profession", e.target.value)}
+                          value={garants[0].profession}
+                          onChange={(e) => updateGarant(0, "profession", e.target.value)}
                           className={cn("mt-1", showPro && proErr.profession && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -985,11 +1303,11 @@ export default function GarantFormPage() {
                       </div>
                       <div className="md:col-span-2">
                         <Label>
-                          Adresse de l’entreprise / administration <span className="text-red-600">*</span>
+                          Adresse de l'entreprise / administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurAdresse}
-                          onChange={(e) => updateGarant("employeurAdresse", e.target.value)}
+                          value={garants[0].employeurAdresse}
+                          onChange={(e) => updateGarant(0, "employeurAdresse", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurAdresse && "border-red-500 bg-red-50")}
                           maxLength={120}
                         />
@@ -999,13 +1317,13 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                          Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                         </Label>
                         <Input
                           type="tel"
-                          value={garant.employeurTelephone}
+                          value={garants[0].employeurTelephone}
                           onChange={(e) =>
-                            handleNumericInputChange(e, (val) => updateGarant("employeurTelephone", val), true)
+                            handleNumericInputChange(e, (val) => updateGarant(0, "employeurTelephone", val), true)
                           }
                           placeholder="01 23 45 67 89"
                           className={cn("mt-1", showPro && proErr.employeurTelephone && "border-red-500 bg-red-50")}
@@ -1021,8 +1339,8 @@ export default function GarantFormPage() {
                         </Label>
                         <DatePicker
                           id="dateFinContrat-garant"
-                          value={garant.dateFinContrat}
-                          onChange={(iso) => updateGarant("dateFinContrat", iso)}
+                          value={garants[0].dateFinContrat}
+                          onChange={(iso) => updateGarant(0, "dateFinContrat", iso)}
                           fromYear={1990}
                           toYear={new Date().getFullYear() + 2}
                           ariaLabel="Sélectionner la date de fin de contrat"
@@ -1040,10 +1358,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1056,15 +1374,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Intérim */}
-                  {garant.typeContrat === "interim" && (
+                  {garants[0].typeContrat === "interim" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
-                          Agence d’intérim principale <span className="text-red-600">*</span>
+                          Agence d'intérim principale <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.agenceInterim}
-                          onChange={(e) => updateGarant("agenceInterim", e.target.value)}
+                          value={garants[0].agenceInterim}
+                          onChange={(e) => updateGarant(0, "agenceInterim", e.target.value)}
                           className={cn("mt-1", showPro && proErr.agenceInterim && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1077,8 +1395,8 @@ export default function GarantFormPage() {
                           Depuis combien de temps êtes-vous en intérim ? <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.dureeInscriptionInterim}
-                          onChange={(e) => updateGarant("dureeInscriptionInterim", e.target.value)}
+                          value={garants[0].dureeInscriptionInterim}
+                          onChange={(e) => updateGarant(0, "dureeInscriptionInterim", e.target.value)}
                           className={cn(
                             "mt-1",
                             showPro && proErr.dureeInscriptionInterim && "border-red-500 bg-red-50",
@@ -1095,10 +1413,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1111,15 +1429,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Fonctionnaire */}
-                  {garant.typeContrat === "fonctionnaire" && (
+                  {garants[0].typeContrat === "fonctionnaire" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
-                          Nom de l’administration / entreprise <span className="text-red-600">*</span>
+                          Nom de l'administration / entreprise <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurNom}
-                          onChange={(e) => updateGarant("employeurNom", e.target.value)}
+                          value={garants[0].employeurNom}
+                          onChange={(e) => updateGarant(0, "employeurNom", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurNom && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1132,8 +1450,8 @@ export default function GarantFormPage() {
                           Profession / poste occupé <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.profession}
-                          onChange={(e) => updateGarant("profession", e.target.value)}
+                          value={garants[0].profession}
+                          onChange={(e) => updateGarant(0, "profession", e.target.value)}
                           className={cn("mt-1", showPro && proErr.profession && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1141,11 +1459,11 @@ export default function GarantFormPage() {
                       </div>
                       <div className="md:col-span-2">
                         <Label>
-                          Adresse de l’administration <span className="text-red-600">*</span>
+                          Adresse de l'administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurAdresse}
-                          onChange={(e) => updateGarant("employeurAdresse", e.target.value)}
+                          value={garants[0].employeurAdresse}
+                          onChange={(e) => updateGarant(0, "employeurAdresse", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurAdresse && "border-red-500 bg-red-50")}
                           maxLength={120}
                         />
@@ -1155,13 +1473,13 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Numéro de téléphone de l’administration <span className="text-red-600">*</span>
+                          Numéro de téléphone de l'administration <span className="text-red-600">*</span>
                         </Label>
                         <Input
                           type="tel"
-                          value={garant.employeurTelephone}
+                          value={garants[0].employeurTelephone}
                           onChange={(e) =>
-                            handleNumericInputChange(e, (val) => updateGarant("employeurTelephone", val), true)
+                            handleNumericInputChange(e, (val) => updateGarant(0, "employeurTelephone", val), true)
                           }
                           placeholder="01 23 45 67 89"
                           className={cn("mt-1", showPro && proErr.employeurTelephone && "border-red-500 bg-red-50")}
@@ -1173,12 +1491,12 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Date d’embauche <span className="text-red-600">*</span>
+                          Date d'embauche <span className="text-red-600">*</span>
                         </Label>
                         <DatePicker
                           id="date-embauche-fct"
-                          value={garant.dateEmbauche}
-                          onChange={(iso) => updateGarant("dateEmbauche", iso)}
+                          value={garants[0].dateEmbauche}
+                          onChange={(iso) => updateGarant(0, "dateEmbauche", iso)}
                           fromYear={1990}
                           toYear={new Date().getFullYear() + 1}
                           ariaLabel="Sélectionner la date d'embauche"
@@ -1196,10 +1514,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1212,15 +1530,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Freelance */}
-                  {garant.typeContrat === "freelance" && (
+                  {garants[0].typeContrat === "freelance" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
                           Activité / métier <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.profession}
-                          onChange={(e) => updateGarant("profession", e.target.value)}
+                          value={garants[0].profession}
+                          onChange={(e) => updateGarant(0, "profession", e.target.value)}
                           className={cn("mt-1", showPro && proErr.profession && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1231,8 +1549,8 @@ export default function GarantFormPage() {
                           Nom de la structure <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurNom}
-                          onChange={(e) => updateGarant("employeurNom", e.target.value)}
+                          value={garants[0].employeurNom}
+                          onChange={(e) => updateGarant(0, "employeurNom", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurNom && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1245,8 +1563,8 @@ export default function GarantFormPage() {
                           Adresse de la structure <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.employeurAdresse}
-                          onChange={(e) => updateGarant("employeurAdresse", e.target.value)}
+                          value={garants[0].employeurAdresse}
+                          onChange={(e) => updateGarant(0, "employeurAdresse", e.target.value)}
                           className={cn("mt-1", showPro && proErr.employeurAdresse && "border-red-500 bg-red-50")}
                           maxLength={120}
                         />
@@ -1260,9 +1578,9 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="tel"
-                          value={garant.employeurTelephone}
+                          value={garants[0].employeurTelephone}
                           onChange={(e) =>
-                            handleNumericInputChange(e, (val) => updateGarant("employeurTelephone", val), true)
+                            handleNumericInputChange(e, (val) => updateGarant(0, "employeurTelephone", val), true)
                           }
                           placeholder="01 23 45 67 89"
                           className={cn("mt-1", showPro && proErr.employeurTelephone && "border-red-500 bg-red-50")}
@@ -1274,12 +1592,12 @@ export default function GarantFormPage() {
                       </div>
                       <div>
                         <Label>
-                          Date de début d’activité <span className="text-red-600">*</span>
+                          Date de début d'activité <span className="text-red-600">*</span>
                         </Label>
                         <DatePicker
                           id="dateDebutActivite-garant"
-                          value={garant.dateDebutActivite}
-                          onChange={(iso) => updateGarant("dateDebutActivite", iso)}
+                          value={garants[0].dateDebutActivite}
+                          onChange={(iso) => updateGarant(0, "dateDebutActivite", iso)}
                           fromYear={1990}
                           toYear={new Date().getFullYear() + 1}
                           ariaLabel="Sélectionner la date de début d'activité"
@@ -1297,10 +1615,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1313,15 +1631,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Retraite */}
-                  {garant.typeContrat === "retraite" && (
+                  {garants[0].typeContrat === "retraite" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <Label>
                           Régime ou caisse principale <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.regimeRetraite}
-                          onChange={(e) => updateGarant("regimeRetraite", e.target.value)}
+                          value={garants[0].regimeRetraite}
+                          onChange={(e) => updateGarant(0, "regimeRetraite", e.target.value)}
                           className={cn("mt-1", showPro && proErr.regimeRetraite && "border-red-500 bg-red-50")}
                           maxLength={100}
                         />
@@ -1335,8 +1653,8 @@ export default function GarantFormPage() {
                         </Label>
                         <DatePicker
                           id="dateDebutRetraite-garant"
-                          value={garant.dateDebutRetraite}
-                          onChange={(iso) => updateGarant("dateDebutRetraite", iso)}
+                          value={garants[0].dateDebutRetraite}
+                          onChange={(iso) => updateGarant(0, "dateDebutRetraite", iso)}
                           fromYear={1950}
                           toYear={new Date().getFullYear() + 5}
                           ariaLabel="Sélectionner la date de départ à la retraite"
@@ -1354,10 +1672,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1370,15 +1688,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Étudiant */}
-                  {garant.typeContrat === "etudiant" && (
+                  {garants[0].typeContrat === "etudiant" && (
                     <div className="space-y-6">
                       <div>
                         <Label>
                           Établissement / formation <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.etablissementFormation}
-                          onChange={(e) => updateGarant("etablissementFormation", e.target.value)}
+                          value={garants[0].etablissementFormation}
+                          onChange={(e) => updateGarant(0, "etablissementFormation", e.target.value)}
                           className={cn("mt-1", showPro && proErr.etablissementFormation && "border-red-500 bg-red-50")}
                           maxLength={150}
                         />
@@ -1390,7 +1708,7 @@ export default function GarantFormPage() {
                         <Label>
                           Êtes-vous en alternance ? <span className="text-red-600">*</span>
                         </Label>
-                        <Select value={garant.alternance} onValueChange={(v) => updateGarant("alternance", v)}>
+                        <Select value={garants[0].alternance} onValueChange={(v) => updateGarant(0, "alternance", v)}>
                           <SelectTrigger
                             className={cn("mt-1", showPro && proErr.alternance && "border-red-500 bg-red-50")}
                           >
@@ -1403,15 +1721,15 @@ export default function GarantFormPage() {
                         </Select>
                         {showPro && proErr.alternance && <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>}
                       </div>
-                      {garant.alternance === "oui" && (
+                      {garants[0].alternance === "oui" && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 border rounded-lg">
                           <div>
                             <Label>
                               Type de contrat <span className="text-red-600">*</span>
                             </Label>
                             <Select
-                              value={garant.typeAlternance}
-                              onValueChange={(v) => updateGarant("typeAlternance", v)}
+                              value={garants[0].typeAlternance}
+                              onValueChange={(v) => updateGarant(0, "typeAlternance", v)}
                             >
                               <SelectTrigger
                                 className={cn("mt-1", showPro && proErr.typeAlternance && "border-red-500 bg-red-50")}
@@ -1429,11 +1747,11 @@ export default function GarantFormPage() {
                           </div>
                           <div>
                             <Label>
-                              Nom de l’entreprise <span className="text-red-600">*</span>
+                              Nom de l'entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
-                              value={garant.employeurNom}
-                              onChange={(e) => updateGarant("employeurNom", e.target.value)}
+                              value={garants[0].employeurNom}
+                              onChange={(e) => updateGarant(0, "employeurNom", e.target.value)}
                               className={cn("mt-1", showPro && proErr.employeurNom && "border-red-500 bg-red-50")}
                               maxLength={100}
                             />
@@ -1443,11 +1761,11 @@ export default function GarantFormPage() {
                           </div>
                           <div className="md:col-span-2">
                             <Label>
-                              Adresse de l’entreprise <span className="text-red-600">*</span>
+                              Adresse de l'entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
-                              value={garant.employeurAdresse}
-                              onChange={(e) => updateGarant("employeurAdresse", e.target.value)}
+                              value={garants[0].employeurAdresse}
+                              onChange={(e) => updateGarant(0, "employeurAdresse", e.target.value)}
                               className={cn("mt-1", showPro && proErr.employeurAdresse && "border-red-500 bg-red-50")}
                               maxLength={120}
                             />
@@ -1457,13 +1775,13 @@ export default function GarantFormPage() {
                           </div>
                           <div>
                             <Label>
-                              Numéro de téléphone de l’entreprise <span className="text-red-600">*</span>
+                              Numéro de téléphone de l'entreprise <span className="text-red-600">*</span>
                             </Label>
                             <Input
                               type="tel"
-                              value={garant.employeurTelephone}
+                              value={garants[0].employeurTelephone}
                               onChange={(e) =>
-                                handleNumericInputChange(e, (val) => updateGarant("employeurTelephone", val), true)
+                                handleNumericInputChange(e, (val) => updateGarant(0, "employeurTelephone", val), true)
                               }
                               placeholder="01 23 45 67 89"
                               className={cn("mt-1", showPro && proErr.employeurTelephone && "border-red-500 bg-red-50")}
@@ -1479,8 +1797,8 @@ export default function GarantFormPage() {
                             </Label>
                             <DatePicker
                               id="dateDebut-garant"
-                              value={garant.dateEmbauche}
-                              onChange={(iso) => updateGarant("dateEmbauche", iso)}
+                              value={garants[0].dateEmbauche}
+                              onChange={(iso) => updateGarant(0, "dateEmbauche", iso)}
                               fromYear={1990}
                               toYear={new Date().getFullYear() + 2}
                               ariaLabel="Sélectionner la date de début de contrat"
@@ -1498,8 +1816,8 @@ export default function GarantFormPage() {
                             </Label>
                             <DatePicker
                               id="dateFin-garant"
-                              value={garant.dateFinContrat}
-                              onChange={(iso) => updateGarant("dateFinContrat", iso)}
+                              value={garants[0].dateFinContrat}
+                              onChange={(iso) => updateGarant(0, "dateFinContrat", iso)}
                               fromYear={1990}
                               toYear={new Date().getFullYear() + 3}
                               ariaLabel="Sélectionner la date de fin de contrat"
@@ -1517,10 +1835,10 @@ export default function GarantFormPage() {
                             </Label>
                             <Input
                               type="text"
-                              value={garant.salaire}
+                              value={garants[0].salaire}
                               onChange={(e) => {
                                 const val = e.target.value
-                                if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                                if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                               }}
                               className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                             />
@@ -1534,15 +1852,15 @@ export default function GarantFormPage() {
                   )}
 
                   {/* Sans emploi */}
-                  {garant.typeContrat === "sans_emploi" && (
+                  {garants[0].typeContrat === "sans_emploi" && (
                     <div className="space-y-6">
                       <div>
                         <Label>
                           Situation actuelle <span className="text-red-600">*</span>
                         </Label>
                         <Input
-                          value={garant.situationActuelleSansEmploi}
-                          onChange={(e) => updateGarant("situationActuelleSansEmploi", e.target.value)}
+                          value={garants[0].situationActuelleSansEmploi}
+                          onChange={(e) => updateGarant(0, "situationActuelleSansEmploi", e.target.value)}
                           className={cn(
                             "mt-1",
                             showPro && proErr.situationActuelleSansEmploi && "border-red-500 bg-red-50",
@@ -1559,10 +1877,10 @@ export default function GarantFormPage() {
                         </Label>
                         <Input
                           type="text"
-                          value={garant.salaire}
+                          value={garants[0].salaire}
                           onChange={(e) => {
                             const val = e.target.value
-                            if (/^[0-9]*$/.test(val)) updateGarant("salaire", val)
+                            if (/^[0-9]*$/.test(val)) updateGarant(0, "salaire", val)
                           }}
                           className={cn("mt-1", showPro && proErr.salaire && "border-red-500 bg-red-50")}
                           maxLength={10}
@@ -1576,8 +1894,8 @@ export default function GarantFormPage() {
                           Origine du revenu principal <span className="text-red-600">*</span>
                         </Label>
                         <Select
-                          value={garant.origineRevenuPrincipal}
-                          onChange={(v) => updateGarant("origineRevenuPrincipal", v)}
+                          value={garants[0].origineRevenuPrincipal}
+                          onValueChange={(v) => updateGarant(0, "origineRevenuPrincipal", v)}
                         >
                           <SelectTrigger
                             className={cn(
@@ -1601,14 +1919,14 @@ export default function GarantFormPage() {
                           <p className="text-xs text-red-600 mt-1">Champ obligatoire</p>
                         )}
                       </div>
-                      {garant.origineRevenuPrincipal === "Autre" && (
+                      {garants[0].origineRevenuPrincipal === "Autre" && (
                         <div>
                           <Label>
                             Précisez la nature du revenu <span className="text-red-600">*</span>
                           </Label>
                           <Input
-                            value={garant.origineRevenuPrincipalAutre}
-                            onChange={(e) => updateGarant("origineRevenuPrincipalAutre", e.target.value)}
+                            value={garants[0].origineRevenuPrincipalAutre}
+                            onChange={(e) => updateGarant(0, "origineRevenuPrincipalAutre", e.target.value)}
                             className={cn(
                               "mt-1",
                               showPro && proErr.origineRevenuPrincipalAutre && "border-red-500 bg-red-50",
@@ -1659,31 +1977,31 @@ export default function GarantFormPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <p>
-                        <span className="text-slate-500">Civilité:</span> {garant.civilite}
+                        <span className="text-slate-500">Civilité:</span> {garants[0].civilite}
                       </p>
                       <p>
-                        <span className="text-slate-500">Nom/Prénom:</span> {garant.nom} {garant.prenom}
+                        <span className="text-slate-500">Nom/Prénom:</span> {garants[0].nom} {garants[0].prenom}
                       </p>
                       <p>
-                        <span className="text-slate-500">Né(e) le:</span> {garant.dateNaissance}
+                        <span className="text-slate-500">Né(e) le:</span> {garants[0].dateNaissance}
                       </p>
                       <p>
-                        <span className="text-slate-500">Lieu de naissance:</span> {garant.lieuNaissance}
+                        <span className="text-slate-500">Lieu de naissance:</span> {garants[0].lieuNaissance}
                       </p>
                       <p>
-                        <span className="text-slate-500">Email:</span> {garant.email}
+                        <span className="text-slate-500">Email:</span> {garants[0].email}
                       </p>
                       <p>
-                        <span className="text-slate-500">Téléphone:</span> {garant.telephone}
+                        <span className="text-slate-500">Téléphone:</span> {garants[0].telephone}
                       </p>
                       <p className="md:col-span-2">
-                        <span className="text-slate-500">Adresse:</span> {garant.adresseActuelle}
+                        <span className="text-slate-500">Adresse:</span> {garants[0].adresseActuelle}
                       </p>
                       <p>
-                        <span className="text-slate-500">Situation conjugale:</span> {garant.situationConjugale}
+                        <span className="text-slate-500">Situation conjugale:</span> {garants[0].situationConjugale}
                       </p>
                       <p>
-                        <span className="text-slate-500">Statut logement:</span> {garant.situationActuelle}
+                        <span className="text-slate-500">Statut logement:</span> {garants[0].situationActuelle}
                       </p>
                     </div>
                   </div>
@@ -1694,29 +2012,29 @@ export default function GarantFormPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <p>
-                        <span className="text-slate-500">Type:</span> {garant.typeContrat}
+                        <span className="text-slate-500">Type:</span> {garants[0].typeContrat}
                       </p>
                       <p>
-                        <span className="text-slate-500">Profession:</span> {garant.profession}
+                        <span className="text-slate-500">Profession:</span> {garants[0].profession}
                       </p>
                       <p>
-                        <span className="text-slate-500">Employeur:</span> {garant.employeurNom}
+                        <span className="text-slate-500">Employeur:</span> {garants[0].employeurNom}
                       </p>
                       <p className="md:col-span-2">
-                        <span className="text-slate-500">Adresse employeur:</span> {garant.employeurAdresse}
+                        <span className="text-slate-500">Adresse employeur:</span> {garants[0].employeurAdresse}
                       </p>
                       <p>
-                        <span className="text-slate-500">Téléphone employeur:</span> {garant.employeurTelephone}
+                        <span className="text-slate-500">Téléphone employeur:</span> {garants[0].employeurTelephone}
                       </p>
                       <p>
-                        <span className="text-slate-500">Date d'embauche:</span> {garant.dateEmbauche}
+                        <span className="text-slate-500">Date d'embauche:</span> {garants[0].dateEmbauche}
                       </p>
                       <p>
-                        <span className="text-slate-500">Date de fin de contrat:</span> {garant.dateFinContrat}
+                        <span className="text-slate-500">Date de fin de contrat:</span> {garants[0].dateFinContrat}
                       </p>
                       <p>
                         <span className="text-slate-500">Revenu principal:</span>{" "}
-                        {garant.salaire ? `${garant.salaire} €` : ""}
+                        {garants[0].salaire ? `${garants[0].salaire} €` : ""}
                       </p>
                     </div>
                   </div>
@@ -1727,7 +2045,7 @@ export default function GarantFormPage() {
                       <div className="text-sm space-y-2">
                         <p className="font-bold">Vérification avant envoi</p>
                         <p>
-                          Un PDF sera généré et transmis à l’agence et aux locataires concernés. Vous recevrez une copie
+                          Un PDF sera généré et transmis à l'agence et aux locataires concernés. Vous recevrez une copie
                           par e‑mail.
                         </p>
                       </div>
@@ -1736,41 +2054,20 @@ export default function GarantFormPage() {
                 </div>
               )}
 
-              {/* Footer actions */}
-              <div className="flex justify-between pt-6 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEtape(Math.max(1, etape - 1))}
-                  disabled={etape === 1}
-                  className="flex items-center gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Précédent
-                </Button>
-                {etape < totalEtapes ? (
-                  <Button
-                    type="button"
-                    onClick={goNext}
-                    className={cn("flex items-center gap-2 text-white", {
-                      "bg-blue-600 hover:bg-blue-700": isStepValid,
-                      "bg-blue-400": !isStepValid,
-                    })}
-                  >
-                    Étape suivante
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => setShowConfirmDialog(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? "Envoi en cours..." : "Envoyer ma fiche garant"}
-                  </Button>
-                )}
-              </div>
+              <StepNavigation
+                currentStep={etape}
+                totalSteps={totalEtapes}
+                maxReachedStep={maxReachedStep}
+                onPrevious={() => setEtape(Math.max(1, etape - 1))}
+                onNext={goNext}
+                onStepClick={goToStep}
+                canGoNext={true}
+                canGoPrevious={etape > 1}
+                isLastStep={etape === totalEtapes}
+                onLastStepAction={() => setShowConfirmDialog(true)}
+                lastStepButtonText="Envoyer ma fiche garant"
+                isSubmitting={isSubmitting}
+              />
             </CardContent>
           </Card>
         </section>

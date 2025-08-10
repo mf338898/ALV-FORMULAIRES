@@ -1,3 +1,28 @@
+#!/bin/bash
+
+echo "🔧 Maintenance automatique du cache - Prévention des régressions de design"
+echo "=================================================================="
+
+# Arrêter tous les processus Next.js
+echo "🛑 Arrêt des processus Next.js..."
+pkill -f "next dev" > /dev/null 2>&1
+pkill -f "next start" > /dev/null 2>&1
+sleep 3
+
+# Nettoyage complet du cache
+echo "🧹 Nettoyage complet du cache..."
+rm -rf .next
+rm -rf node_modules/.cache
+npm cache clean --force > /dev/null 2>&1
+
+# Vérifier l'intégrité des fichiers critiques
+echo "🔍 Vérification de l'intégrité des fichiers..."
+
+# Vérifier globals.css
+if ! grep -q "@tailwind base" "app/globals.css"; then
+    echo "❌ ERREUR: globals.css corrompu - restauration..."
+    # Restaurer le fichier (copie depuis le script pre-build-check.sh)
+    cat > "app/globals.css" << 'EOF'
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -88,3 +113,30 @@
     @apply bg-background text-foreground;
   }
 }
+EOF
+    echo "✅ globals.css restauré"
+fi
+
+# Vérifier tailwind.config.ts
+if ! grep -q "tailwindcss-animate" "tailwind.config.ts"; then
+    echo "❌ ERREUR: tailwind.config.ts corrompu"
+    exit 1
+fi
+
+# Supprimer les dossiers conflictuels
+echo "🗑️  Suppression des dossiers conflictuels..."
+rm -rf styles
+rm -rf .cache
+
+# Vérifier les dépendances
+echo "📦 Vérification des dépendances..."
+if [ ! -d "node_modules" ] || [ ! -f "package-lock.json" ]; then
+    echo "⚠️  Dépendances manquantes - réinstallation..."
+    npm install
+fi
+
+echo "✅ Maintenance terminée - le projet est prêt !"
+echo ""
+echo "💡 Pour démarrer le projet : npm run dev"
+echo "💡 Pour un nettoyage complet : npm run fresh"
+echo "💡 Pour la maintenance : ./maintenance-cache.sh" 

@@ -76,6 +76,7 @@ const garantiesVides: Garanties = {
 garantFamilial: "non",
 garantieVisale: "non",
 precisionGarant: "",
+garants: []
 }
 
 const NumberInput = ({ value, onChange }: { value: number; onChange: (value: number) => void }) => {
