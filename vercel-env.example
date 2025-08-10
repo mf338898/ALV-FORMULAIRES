@@ -1,0 +1,18 @@
+# Configuration Vercel - Variables d'environnement
+# Copiez ces variables dans votre dashboard Vercel
+
+# Configuration Gmail
+GMAIL_USER=votre-email@gmail.com
+GMAIL_APP_PASSWORD=votre-mot-de-passe-app
+
+# Emails de test
+TEST_EMAIL=test@example.com
+RECIPIENT_EMAIL=destinataire@example.com
+
+# Configuration Next.js
+NODE_ENV=production
+NEXT_PUBLIC_SITE_URL=https://votre-projet.vercel.app
+
+# Autres variables si nécessaire
+# DATABASE_URL=your-database-url
+# API_KEY=your-api-key 

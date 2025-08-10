@@ -1,19 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  basePath: process.env.NODE_ENV === 'production' ? '/ALV-FORMULAIRES' : '',
-  trailingSlash: true,
+  // Configuration normale pour Vercel (toutes les fonctionnalités)
   images: {
-    unoptimized: true
+    unoptimized: false
   },
-  // Désactiver les fonctionnalités incompatibles avec l'export statique
-  typescript: {
-    ignoreBuildErrors: true
-  },
-  eslint: {
-    ignoreDuringBuilds: true
-  },
-  // Configuration pour l'export statique
+  // Activer toutes les fonctionnalités
+  serverExternalPackages: ['pdf-lib']
 };
 
 export default nextConfig;

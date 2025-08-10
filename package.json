@@ -17,10 +17,12 @@
     "cache-clean": "./maintenance-cache.sh && npm run dev",
     "force-clean": "pkill -f 'next dev' && ./maintenance-cache.sh && npm run dev",
     "export": "next build",
-    "deploy": "npm run build && gh-pages -d out",
+    "deploy": "npm run build",
     "predeploy": "npm run build",
     "build:static": "NODE_ENV=production next build",
-    "deploy:gh-pages": "npm run build:static && gh-pages -d out --dotfiles"
+    "deploy:gh-pages": "npm run build:static && gh-pages -d out --dotfiles",
+    "deploy:vercel": "vercel --prod",
+    "build:vercel": "npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
