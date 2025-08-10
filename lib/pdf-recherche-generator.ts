@@ -1,561 +1,402 @@
-import { PDFDocument, StandardFonts, rgb, type RGB } from "pdf-lib"
+import { PDFDocument, StandardFonts, rgb, type RGB, type PDFPage } from "pdf-lib"
 import { readFile } from "fs/promises"
 import path from "path"
 import type { AppFormData } from "./types"
 
-// Brand palette and text styles aligned with the main fiche
-const PRIMARY = rgb(0 / 255, 114 / 255, 188 / 255) // #0072BC
-const TEXT_INFO = rgb(110 / 255, 110 / 255, 110 / 255) // #6E6E6E
+// Brand and style - EXACTEMENT comme pdf-garant-generator.ts
+const PRIMARY = rgb(0 / 255, 114 / 255, 188 / 255) // #0072BC (brand blue)
+const TEXT_INFO = rgb(110 / 255, 110 / 255, 110 / 255) // #6E6E6E (secondary text)
 const BLACK = rgb(0, 0, 0)
-const SEP_GRAY = rgb(218 / 255, 218 / 255, 218 / 255) // #DADADA
+const SEP_GRAY = rgb(218 / 255, 218 / 255, 218 / 255) // #DADADA separator
 
-// Page layout (A4, pt)
+// Page and layout (A4) - OPTIMISÉ POUR LA LISIBILITÉ - EXACTEMENT comme pdf-garant-generator.ts
 const PAGE_WIDTH = 595.28
 const PAGE_HEIGHT = 841.89
-const MARGIN = 48
+const MARGIN = 40 // Augmenté de 35 à 40 pour plus d'espace
+const GUTTER = 25 // Augmenté de 20 à 25 pour séparer les colonnes
+const LABEL_WIDTH = 180 // Augmenté de 130 à 180 pour éviter le chevauchement
+const VALUE_INDENT = 12 // Augmenté de 6 à 12 pour plus d'espacement
+const TITLE_SIZE = 18 // Augmenté de 17 à 18 pour plus de visibilité
+const SECTION_SIZE = 14 // Augmenté de 13 à 14 pour les titres de section
+const LABEL_SIZE = 11 // Augmenté de 10 à 11 pour les labels
+const BODY_SIZE = 12 // Augmenté de 11 à 12 pour le texte principal
+const LINE_HEIGHT = 18 // Augmenté de 14 à 18 pour plus d'espacement entre lignes
+const LONG_LINE_HEIGHT = Math.round(BODY_SIZE * 1.6) // ≈ 19 pour la lisibilité avec plus d'espace
+const BOTTOM_RESERVE = 70 // Augmenté de 60 à 70 pour la marge de sécurité
 
-// Typography
-const TITLE_SIZE = 18
-const SECTION_SIZE = 13
-const BODY_SIZE = 11
-const LABEL_SIZE = 10
-
-// Line heights
-const LH_BODY = 14 // ~1.27 for BODY_SIZE
-const LH_TIGHT = 12
-
-// Spacing
-const LOGO_MAX_H = 36
-const GAP_BELOW_LOGO = 14 // avoid overlap with title
-const GAP_BELOW_TITLE = 10
-const GAP_ABOVE_SECTION = 16
-const GAP_AFTER_SECTION_TITLE = 12
-const BLOCK_GAP = 16
-const VALUE_INDENT = 6
-const COL_GAP = 24
-
-// Box layout
-const BOX_PADDING = 12
-const BOX_TITLE_GAP = 10
-const LABEL_WIDTH_BOX = 84 // labels inside LOCATAIRE(S)
-const LABEL_WIDTH_MAIN = 180 // labels inside criteria lines
-
-// Symbols and helpers
-const dash = "–"
+// Utilities - EXACTEMENT comme pdf-garant-generator.ts
 const nonEmpty = (v?: string | null) => Boolean(v && String(v).trim() !== "")
+const dash = "-" // single dash for missing data
 const showOrDash = (v?: string | null) => (nonEmpty(v) ? String(v) : dash)
 
+function toTitleCase(s?: string | null) {
+  if (!nonEmpty(s)) return ""
+  const lower = String(s).toLowerCase()
+  return lower.replace(/\p{L}+/gu, (w) => w.charAt(0).toUpperCase() + w.slice(1))
+}
+
+// Sanitize text for Helvetica (WinAnsi) to prevent U+202F etc.
 function pdfSafe(input?: string) {
   if (!input) return ""
   return input
     .normalize("NFKC")
-    .replace(/[\u202F\u00A0\u2009\u2007\u2060]/g, " ")
-    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[\u202F\u00A0\u2009\u2007\u2060]/g, " ") // narrow NBSP, NBSP, thin/figure spaces, word joiner
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width chars
 }
 
-// Wrap text to a max width; also split very long words to prevent overflow
+// Robust word wrap with long-token breaking - EXACTEMENT comme pdf-garant-generator.ts
+function breakLongTokenByWidth(token: string, font: any, size: number, maxWidth: number): string[] {
+  const parts: string[] = []
+  let start = 0
+  while (start < token.length) {
+    let lo = start + 1
+    let hi = token.length
+    let best = lo
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2)
+      const slice = token.slice(start, mid)
+      const w = font.widthOfTextAtSize(slice, size)
+      if (w <= maxWidth || slice.length === 1) {
+        best = mid
+        lo = mid + 1
+      } else {
+        hi = mid - 1
+      }
+    }
+    const piece = token.slice(start, best)
+    if (!piece) break
+    parts.push(piece)
+    start = best
+  }
+  return parts.length ? parts : [token]
+}
+
 function wrapByWidth(text: string, font: any, size: number, maxWidth: number): string[] {
   const t = pdfSafe(text)
   if (!t) return [dash]
-  const rawWords = t.split(/\s+/).filter(Boolean)
-
-  // Split any "oversized" single words by characters
-  const words: string[] = []
-  for (const w of rawWords) {
-    if (font.widthOfTextAtSize(w, size) <= maxWidth) {
-      words.push(w)
-      continue
-    }
-    // Split by characters while keeping width under maxWidth
-    let chunk = ""
-    for (const ch of Array.from(w)) {
-      const candidate = chunk + ch
-      if (font.widthOfTextAtSize(candidate, size) > maxWidth) {
-        if (chunk.length > 0) {
-          words.push(chunk)
-          chunk = ch
-        } else {
-          // Single glyph wider than line (very rare); force push
-          words.push(ch)
-          chunk = ""
-        }
-      } else {
-        chunk = candidate
-      }
-    }
-    if (chunk) words.push(chunk)
-  }
-
+  const words = t.split(/\s+/)
   const lines: string[] = []
   let current = ""
-  for (const w of words) {
-    const candidate = current ? `${current} ${w}` : w
-    if (font.widthOfTextAtSize(candidate, size) > maxWidth && current) {
-      lines.push(current)
-      current = w
-    } else {
-      current = candidate
+
+  function pushCurrent() {
+    if (current.trim()) {
+      lines.push(current.trim())
+      current = ""
     }
   }
-  if (current) lines.push(current)
+
+  for (const word of words) {
+    const testLine = current ? `${current} ${word}` : word
+    const testWidth = font.widthOfTextAtSize(testLine, size)
+    if (testWidth <= maxWidth) {
+      current = testLine
+    } else {
+      if (current) {
+        pushCurrent()
+        current = word
+      } else {
+        // Single word too long - break it
+        const broken = breakLongTokenByWidth(word, font, size, maxWidth)
+        lines.push(...broken)
+      }
+    }
+  }
+  pushCurrent()
   return lines.length ? lines : [dash]
 }
 
-function drawCenteredText(page: any, text: string, y: number, font: any, size: number, color: RGB) {
-  const w = font.widthOfTextAtSize(text, size)
-  const x = (PAGE_WIDTH - w) / 2
-  page.drawText(text, { x, y, size, font, color })
-  return y
-}
+// Header drawing - EXACTEMENT comme pdf-garant-generator.ts
+async function drawHeader(page: any, pdf: PDFDocument, fontBold: any, fontReg: any) {
+  const yTop = PAGE_HEIGHT - MARGIN
 
-async function embedLogo(pdf: PDFDocument) {
+  // Logo (centered, max-height 30px, margin-bottom 10px) - EXACTEMENT comme pdf-garant-generator.ts
+  let logoImage: any | null = null
   try {
     const logoPath = path.join(process.cwd(), "public", "images", "logo-alv.png")
-    const bytes = await readFile(logoPath)
-    return await pdf.embedPng(bytes)
+    const logoBytes = await readFile(logoPath)
+    logoImage = await pdf.embedPng(logoBytes)
   } catch {
-    return null
+    // ignore if logo not found
   }
-}
 
-function drawFooter(page: any, fontReg: any) {
-  const text = pdfSafe("Document strictement confidentiel – destiné à un usage locatif.")
-  const size = 10 // BODY_SIZE - 1 (smaller)
-  const w = fontReg.widthOfTextAtSize(text, size)
-  const x = (PAGE_WIDTH - w) / 2
-  const y = MARGIN - 22
-  page.drawText(text, { x, y, size, font: fontReg, color: TEXT_INFO })
-}
-
-async function drawHeader(page: any, pdf: PDFDocument, fontBold: any) {
-  const yTop = PAGE_HEIGHT - MARGIN
   let y = yTop
-
-  // Logo centered, max height
-  const logo = await embedLogo(pdf)
-  if (logo) {
-    const ratio = Math.min(1, LOGO_MAX_H / logo.height)
-    const h = logo.height * ratio
-    const w = logo.width * ratio
-    const x = (PAGE_WIDTH - w) / 2
-    page.drawImage(logo, { x, y: yTop - h, width: w, height: h })
-    y = yTop - h - GAP_BELOW_LOGO
+  if (logoImage) {
+    const logoHeight = 30 // Exactement comme pdf-garant-generator.ts
+    const ratio = logoHeight / logoImage.height
+    const logoWidth = logoImage.width * ratio
+    const x = (PAGE_WIDTH - logoWidth) / 2
+    page.drawImage(logoImage, { x, y: yTop - logoHeight, width: logoWidth, height: logoHeight })
+    y = yTop - logoHeight - 35 // Augmenté de 20 à 35 pour un espacement généreux
   } else {
-    y = yTop - 14
+    y = yTop - 35
   }
 
-  // Title in brand color
-  drawCenteredText(page, pdfSafe("CRITÈRES DE RECHERCHE"), y - 2, fontBold, TITLE_SIZE, PRIMARY)
-  y -= TITLE_SIZE + GAP_BELOW_TITLE
+  // Titre principal
+  const title = "CRITÈRES DE RECHERCHE"
+  const titleSize = TITLE_SIZE
+  const titleWidth = fontBold.widthOfTextAtSize(title, titleSize)
+  const titleX = (PAGE_WIDTH - titleWidth) / 2
+  page.drawText(title, { x: titleX, y, size: titleSize, font: fontBold, color: PRIMARY })
+  y -= titleSize + 25 // Augmenté de 15 à 25 pour plus d'espace après le titre
+
+  // Sous-titre
+  const subtitle = "Formulaire de recherche de logement"
+  const subtitleSize = SECTION_SIZE
+  const subtitleWidth = fontReg.widthOfTextAtSize(subtitle, subtitleSize)
+  const subtitleX = (PAGE_WIDTH - subtitleWidth) / 2
+  page.drawText(subtitle, { x: subtitleX, y, size: subtitleSize, font: fontReg, color: TEXT_INFO })
+  y -= subtitleSize + 25 // Augmenté de 20 à 25
+
   return y
 }
 
-function drawSectionHeader(page: any, title: string, x: number, y: number, fontBold: any) {
-  y -= GAP_ABOVE_SECTION
-  const textY = y
-  page.drawText(pdfSafe(title.toUpperCase()), { x, y: textY, size: SECTION_SIZE, font: fontBold, color: PRIMARY })
-  const lineY = textY - 10
+// Footer drawing - EXACTEMENT comme pdf-garant-generator.ts
+function drawFooter(page: any, fontReg: any) {
+  const y = MARGIN + BOTTOM_RESERVE
   page.drawLine({
-    start: { x, y: lineY },
-    end: { x: page.getWidth() - x, y: lineY },
+    start: { x: MARGIN, y },
+    end: { x: PAGE_WIDTH - MARGIN, y },
     thickness: 1,
     color: SEP_GRAY,
   })
-  return lineY - GAP_AFTER_SECTION_TITLE
+
+  const footerText = "ALV PLEYBEN IMMOBILIER - 19 Place du Général de Gaulle - 29190 PLEYBEN"
+  const footerWidth = fontReg.widthOfTextAtSize(footerText, 9)
+  const footerX = (PAGE_WIDTH - footerWidth) / 2
+  page.drawText(footerText, { x: footerX, y: y - 12, size: 9, font: fontReg, color: TEXT_INFO })
 }
 
-// If not enough space, create a new page; re-draw footer and return new page and y
-async function ensureSpaceOrNewPage(
-  pdf: PDFDocument,
-  page: any,
-  y: number,
-  needed: number,
-  fonts: { reg: any; bold: any },
-  roptions?: { onNewPage?: (np: any) => Promise<number> | number },
-) {
-  if (y - needed < MARGIN + 40) {
-    const next = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
-    drawFooter(next, fonts.reg)
-    // redraw header on new page
-    let ny = await drawHeader(next, pdf, fonts.bold)
-    if (roptions?.onNewPage) {
-      const maybe = await roptions.onNewPage(next)
-      if (typeof maybe === "number") ny = maybe
-    }
-    return { page: next, y: ny }
-  }
-  return { page, y }
-}
-
-// Inline "Label : value" with wrapping on value only
-function drawInlineRow(
-  page: any,
-  x: number,
-  y: number,
-  label: string,
-  value: string,
-  fonts: { reg: any; bold: any },
-  colWidth: number,
-  labelWidth: number,
-) {
-  const labelText = `${label} :`
-  page.drawText(pdfSafe(labelText), { x, y, size: LABEL_SIZE, font: fonts.bold, color: TEXT_INFO })
-
-  const valueX = x + labelWidth + VALUE_INDENT
-  const maxWidth = colWidth - labelWidth - VALUE_INDENT
-  const wrapped = wrapByWidth(value || dash, fonts.reg, BODY_SIZE, maxWidth)
-
-  // First line baseline
-  page.drawText(pdfSafe(wrapped[0]), { x: valueX, y, size: BODY_SIZE, font: fonts.reg, color: BLACK })
-  let yy = y
-
-  for (let i = 1; i < wrapped.length; i++) {
-    yy -= LH_BODY
-    page.drawText(pdfSafe(wrapped[i]!), { x: valueX, y: yy, size: BODY_SIZE, font: fonts.reg, color: BLACK })
-  }
-  yy -= 6
-  return yy
-}
-
-// Draw long text field that may span multiple pages; when breaking, repeat the section header
-async function drawLongTextField({
-  pdf,
-  page,
-  y,
-  label,
-  value,
-  fonts,
-  x,
-  colWidth,
-  labelWidth,
-  sectionTitleForContinuation,
-}: {
-  pdf: PDFDocument
-  page: any
-  y: number
-  label: string
-  value: string
-  fonts: { reg: any; bold: any }
-  x: number
-  colWidth: number
-  labelWidth: number
-  sectionTitleForContinuation: string
-}) {
-  const labelText = `${label} :`
-  const labelWidthPixels = fonts.bold.widthOfTextAtSize(labelText, LABEL_SIZE)
-  const valueX = x + labelWidth + VALUE_INDENT
-  const maxWidth = colWidth - labelWidth - VALUE_INDENT
-  const wrapped = wrapByWidth(value || dash, fonts.reg, BODY_SIZE, maxWidth)
-
-  let currentPage = page
-  let yy = y
-
-  // First line with label
-  if (yy - (LH_TIGHT + 6) < MARGIN + 40) {
-    const ensured = await ensureSpaceOrNewPage(pdf, currentPage, yy, LH_TIGHT + 6, fonts, {
-      onNewPage: async (np) =>
-        drawSectionHeader(np, sectionTitleForContinuation, MARGIN, PAGE_HEIGHT - MARGIN, fonts.bold),
-    })
-    currentPage = ensured.page
-    yy = ensured.y
-  }
-
-  currentPage.drawText(pdfSafe(labelText), { x, y: yy, size: LABEL_SIZE, font: fonts.bold, color: TEXT_INFO })
-  currentPage.drawText(pdfSafe(wrapped[0]), {
-    x: valueX,
-    y: yy,
-    size: BODY_SIZE,
-    font: fonts.reg,
-    color: BLACK,
+// Section header drawing - EXACTEMENT comme pdf-garant-generator.ts
+function drawSectionHeader(page: any, title: string, x: number, y: number, fontBold: any) {
+  const titleText = title.toUpperCase()
+  const titleWidth = fontBold.widthOfTextAtSize(titleText, SECTION_SIZE)
+  const titleX = (PAGE_WIDTH - titleWidth) / 2
+  page.drawText(titleText, { x: titleX, y, size: SECTION_SIZE, font: fontBold, color: PRIMARY })
+  y -= SECTION_SIZE + 8 // Augmenté de 6 à 8 pour plus d'espace
+  page.drawLine({
+    start: { x: MARGIN, y },
+    end: { x: PAGE_WIDTH - MARGIN, y },
+    thickness: 0.4,
+    color: SEP_GRAY,
   })
+  y -= LINE_HEIGHT
+  return y
+}
 
-  // Remaining lines with pagination; soft-limit to ~4 lines per page if plenty of space to improve readability
-  let lineOnThisPage = 1
-  for (let i = 1; i < wrapped.length; i++) {
-    if (yy - LH_BODY < MARGIN + 40 || lineOnThisPage >= 4) {
-      const ensured = await ensureSpaceOrNewPage(pdf, currentPage, yy, LH_BODY, fonts, {
-        onNewPage: async (np) =>
-          drawSectionHeader(np, sectionTitleForContinuation, MARGIN, PAGE_HEIGHT - MARGIN, fonts.bold),
-      })
-      currentPage = ensured.page
-      yy = ensured.y
-      lineOnThisPage = 0
-      // Re-print an empty label spacer for alignment on continuation
-      // optional visual spacer at the start of continuation
-    }
-    yy -= LH_BODY
-    currentPage.drawText(pdfSafe(wrapped[i]!), { x: valueX, y: yy, size: BODY_SIZE, font: fonts.reg, color: BLACK })
-    lineOnThisPage++
+// Types - EXACTEMENT comme pdf-garant-generator.ts
+type Fonts = { reg: any; bold: any }
+type DocContext = {
+  pdf: PDFDocument
+  page: PDFPage
+  y: number
+  fonts: Fonts
+}
+
+// Space management - EXACTEMENT comme pdf-garant-generator.ts
+async function ensureSpace(ctx: DocContext, neededHeight: number) {
+  if (ctx.y - neededHeight < MARGIN + BOTTOM_RESERVE) {
+    const newPage = ctx.pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+    await drawHeader(newPage, ctx.pdf, ctx.fonts.bold, ctx.fonts.reg)
+    ctx.page = newPage
+    ctx.y = PAGE_HEIGHT - MARGIN - 120 // Position après le header
   }
-
-  yy -= 6
-  return { page: currentPage, y: yy, labelWidthPixels }
 }
 
-// LOCATAIRE(S) box utilities
-type SimpleLoc = {
-  civilite?: string | null
-  nom?: string | null
-  prenom?: string | null
-  telephone?: string | null
-  email?: string | null
+// Row type for criteria - EXACTEMENT comme pdf-garant-generator.ts
+type Row = { 
+  label: string; 
+  value: string | string[]; 
+  highlight?: boolean;
 }
 
-function measureLocataireColumnHeight(l: SimpleLoc, fonts: { reg: any; bold: any }, innerWidth: number): number {
-  const rows: [string, string][] = [
-    ["Civilité", showOrDash(l.civilite)],
-    ["Nom", showOrDash(l.nom)],
-    ["Prénom", showOrDash(l.prenom)],
-    ["Téléphone", showOrDash(l.telephone)],
-    ["Email", showOrDash(l.email)],
-  ]
-  let height = 0
-  for (const [, value] of rows) {
-    const maxWidth = innerWidth - LABEL_WIDTH_BOX - VALUE_INDENT
-    const wrapped = wrapByWidth(value, fonts.reg, BODY_SIZE, maxWidth)
-    height += LH_TIGHT + (wrapped.length - 1) * LH_BODY + 6
-  }
-  return height
-}
-
-function drawLocataireColumn(
-  page: any,
-  l: SimpleLoc,
-  x: number,
-  y: number,
-  fonts: { reg: any; bold: any },
-  innerWidth: number,
-) {
-  const rows: [string, string][] = [
-    ["Civilité", showOrDash(l.civilite)],
-    ["Nom", showOrDash(l.nom)],
-    ["Prénom", showOrDash(l.prenom)],
-    ["Téléphone", showOrDash(l.telephone)],
-    ["Email", showOrDash(l.email)],
-  ]
-  let yy = y
-  for (const [label, value] of rows) {
-    const labelText = `${label} :`
-    page.drawText(pdfSafe(labelText), { x, y: yy, size: LABEL_SIZE, font: fonts.bold, color: TEXT_INFO })
-    const valueX = x + LABEL_WIDTH_BOX + VALUE_INDENT
-    const maxWidth = innerWidth - LABEL_WIDTH_BOX - VALUE_INDENT
-    const wrapped = wrapByWidth(value, fonts.reg, BODY_SIZE, maxWidth)
-    page.drawText(pdfSafe(wrapped[0]), { x: valueX, y: yy, size: BODY_SIZE, font: fonts.reg, color: BLACK })
-    for (let i = 1; i < wrapped.length; i++) {
-      yy -= LH_BODY
-      page.drawText(pdfSafe(wrapped[i]!), { x: valueX, y: yy, size: BODY_SIZE, font: fonts.reg, color: BLACK })
-    }
-    yy -= 6 + LH_TIGHT
-  }
-  return yy
-}
-
-async function drawLocatairesBox(
-  pdf: PDFDocument,
-  page: any,
-  y: number,
-  fonts: { reg: any; bold: any },
-  locataires: SimpleLoc[],
-) {
-  if (!locataires || locataires.length === 0) return { page, y }
-
-  const contentX = MARGIN
-  const contentWidth = PAGE_WIDTH - 2 * MARGIN
-  const colWidth = (contentWidth - COL_GAP) / 2
-  const innerWidth = colWidth - BOX_PADDING * 2
-
-  let currentPage = page
-  let i = 0
-  while (i < locataires.length) {
-    const left = locataires[i]!
-    const right = locataires[i + 1] || undefined
-
-    const leftHeight = measureLocataireColumnHeight(left, fonts, innerWidth)
-    const rightHeight = right ? measureLocataireColumnHeight(right, fonts, innerWidth) : 0
-    const bodyHeight = Math.max(leftHeight, rightHeight)
-    const titleHeight = SECTION_SIZE + 4
-    const boxHeight = BOX_PADDING + titleHeight + BOX_TITLE_GAP + bodyHeight + BOX_PADDING
-
-    const ensured = await ensureSpaceOrNewPage(pdf, currentPage, y, boxHeight, fonts)
-    if (ensured.page !== currentPage) {
-      currentPage = ensured.page
-    }
-    y = ensured.y
-
-    // Draw box frame
-    const boxYTop = y
-    currentPage.drawRectangle({
-      x: contentX,
-      y: boxYTop - boxHeight,
-      width: contentWidth,
-      height: boxHeight,
-      borderColor: SEP_GRAY,
-      borderWidth: 1,
-    })
-
-    // Title
-    currentPage.drawText(pdfSafe("LOCATAIRE(S)"), {
-      x: contentX + BOX_PADDING,
-      y: boxYTop - BOX_PADDING - SECTION_SIZE,
-      size: SECTION_SIZE,
-      font: fonts.bold,
-      color: PRIMARY,
-    })
-
-    // Columns baseline
-    const contentTopY = boxYTop - BOX_PADDING - SECTION_SIZE - BOX_TITLE_GAP
-
-    // Left col
-    const leftX = contentX + BOX_PADDING
-    drawLocataireColumn(currentPage, left, leftX, contentTopY, fonts, innerWidth)
-
-    // Right col
-    if (right) {
-      const rightX = contentX + colWidth + COL_GAP + BOX_PADDING
-      drawLocataireColumn(currentPage, right, rightX, contentTopY, fonts, innerWidth)
-    }
-
-    // Move y for next row
-    y = contentTopY - bodyHeight - BOX_PADDING - 10
-    i += 2
-  }
-
-  return { page: currentPage, y }
-}
-
-// Format "Ville (CP)" when possible
-function formatSecteur(raw?: string | null): string {
-  if (!nonEmpty(raw)) return dash
-  const s = String(raw).trim()
-  // 75001 Paris -> Paris (75001)
-  let m = s.match(/^(\d{5})\s+(.+)$/)
-  if (m) return `${m[2]} (${m[1]})`
-  // Paris 75001 -> Paris (75001)
-  m = s.match(/^(.+?)\s+(\d{5})$/)
-  if (m) return `${m[1]} (${m[2]})`
-  // Paris (75001) -> keep
-  m = s.match(/^(.+)\s*$$\s*(\d{5})\s*$$$/)
-  if (m) return `${m[1]} (${m[2]})`
-  return s
-}
-
-// Build rows for the compact "CRITÈRES" section
-function getCompactCriteriaRows(c?: AppFormData["criteresRecherche"]) {
+// Build rows for the "CRITÈRES DU BIEN" section
+function getCriteriaRows(c?: AppFormData["criteresRecherche"]): Row[] {
   return [
-    ["Secteur souhaité", formatSecteur(c?.secteurSouhaite)],
-    ["Nombre de chambres minimum", showOrDash(c?.nombreChambres)],
-    ["Rayon de recherche (km)", showOrDash(c?.rayonKm)],
-    ["Date souhaitée d’emménagement", showOrDash(c?.dateEmmenagement)],
-    ["Préavis à déposer", showOrDash(c?.preavisADeposer)],
-  ] as [label: string, value: string][]
+    { label: "Secteur souhaité", value: showOrDash(c?.secteurSouhaite) },
+    { label: "Nombre de chambres minimum", value: showOrDash(c?.nombreChambres) },
+    { label: "Loyer maximum souhaité", value: c?.loyerMax ? `${c.loyerMax} € / mois` : dash },
+    { label: "Rayon de recherche", value: c?.rayonKm ? `${c.rayonKm} km` : dash },
+  ]
 }
 
-// Public API
-export function buildRecherchePdfFilename(data: AppFormData) {
-  const l = data.locataires?.[0]
-  const tag = l ? `${(l.nom || "Nom").replace(/\s+/g, "_")}_${(l.prenom || "Prenom").replace(/\s+/g, "_")}` : "dossier"
-  return `CR-Criteres_de_recherche-${tag}.pdf`
+// Build rows for the "PROJET DE DÉMÉNAGEMENT" section
+function getDemenagementRows(c?: AppFormData["criteresRecherche"]): Row[] {
+  return [
+    { label: "Date souhaitée d'emménagement", value: showOrDash(c?.dateEmmenagement) },
+    { label: "Préavis à déposer", value: showOrDash(c?.preavisADeposer) },
+  ]
 }
 
+// Prepare row parts for drawing - EXACTEMENT comme pdf-garant-generator.ts
+type PreparedPart = { lines: string[]; lh: number }
+type PreparedRow = { parts: PreparedPart[]; totalHeight: number }
+
+function prepareRowParts(row: Row, font: any, colMaxWidth: number): PreparedRow {
+  const parts: PreparedPart[] = []
+  let totalHeight = 0
+
+  if (Array.isArray(row.value)) {
+    // Multi-line value
+    for (const val of row.value) {
+      const wrapped = wrapByWidth(val, font, BODY_SIZE, colMaxWidth)
+      const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      parts.push({ lines: wrapped, lh })
+      totalHeight += wrapped.length * lh
+    }
+  } else {
+    // Single value
+    const wrapped = wrapByWidth(row.value, font, BODY_SIZE, colMaxWidth)
+    const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+    parts.push({ lines: wrapped, lh })
+    totalHeight += wrapped.length * lh
+  }
+
+  return { parts, totalHeight }
+}
+
+// Draw labeled row from prepared data - EXACTEMENT comme pdf-garant-generator.ts
+function drawLabeledRowFromPrepared(ctx: DocContext, row: Row, prepared: PreparedRow, xLabel: number, xValue: number) {
+  const fontValue = row.highlight ? ctx.fonts.bold : ctx.fonts.reg
+  
+  // Draw label
+  ctx.page.drawText(pdfSafe(row.label), { x: xLabel, y: ctx.y, size: LABEL_SIZE, font: ctx.fonts.bold, color: TEXT_INFO })
+  
+  // Draw value parts
+  for (const part of prepared.parts) {
+    for (const line of part.lines) {
+      ctx.page.drawText(pdfSafe(line), { x: xValue, y: ctx.y, size: BODY_SIZE, font: fontValue, color: BLACK })
+      ctx.y -= part.lh
+    }
+  }
+}
+
+// Draw locataires box - EXACTEMENT comme pdf-garant-generator.ts
+async function drawLocatairesBox(ctx: DocContext, locataires: any[]) {
+  if (!locataires || locataires.length === 0) return
+
+  await ensureSpace(ctx, 40)
+  ctx.y = drawSectionHeader(ctx.page, "Locataire(s)", MARGIN, ctx.y, ctx.fonts.bold)
+
+  for (const loc of locataires) {
+    const nom = [toTitleCase(loc.nom), toTitleCase(loc.prenom)].filter(Boolean).join(" ") || dash
+    const line = `${nom}${loc.email ? ` – ${loc.email}` : ""}${loc.telephone ? ` – ${loc.telephone}` : ""}`
+    const wrapped = wrapByWidth(line, ctx.fonts.reg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 16)
+    const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+    for (const l of wrapped) {
+      await ensureSpace(ctx, lh)
+      ctx.page.drawText(pdfSafe(`• ${l}`), {
+        x: MARGIN + 16,
+        y: ctx.y,
+        size: BODY_SIZE,
+        font: ctx.fonts.reg,
+        color: BLACK,
+      })
+      ctx.y -= lh
+    }
+  }
+}
+
+// Main function - EXACTEMENT comme pdf-garant-generator.ts
 export async function generateRecherchePdf(data: AppFormData): Promise<Buffer> {
   const pdf = await PDFDocument.create()
-  let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
   const fontReg = await pdf.embedFont(StandardFonts.Helvetica)
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold)
-  drawFooter(page, fontReg)
 
-  const fonts = { reg: fontReg, bold: fontBold }
-  let y = await drawHeader(page, pdf, fontBold)
+  // Page 1 - EXACTEMENT comme pdf-garant-generator.ts
+  const page1 = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
+  let y1 = await drawHeader(page1, pdf, fontBold, fontReg)
+  y1 -= 6 // Augmenté de 4 à 6
 
-  // LOCATAIRE(S) box
-  const locs: SimpleLoc[] = (data.locataires || []).map((l) => ({
-    civilite: l?.civilite,
-    nom: l?.nom,
-    prenom: l?.prenom,
-    telephone: l?.telephone,
-    email: l?.email,
-  }))
-  const box = await drawLocatairesBox(pdf, page, y, fonts, locs)
-  page = box.page
-  y = box.y - BLOCK_GAP
-
-  // "CRITÈRES" section (compact rows)
-  y = drawSectionHeader(page, "Critères", MARGIN, y, fontBold)
-  const totalWidth = PAGE_WIDTH - 2 * MARGIN
-  const colWidth = totalWidth
-  const x = MARGIN
-
-  for (const [label, value] of getCompactCriteriaRows(data.criteresRecherche)) {
-    const maxW = colWidth - LABEL_WIDTH_MAIN - VALUE_INDENT
-    const wrapped = wrapByWidth(value, fontReg, BODY_SIZE, maxW)
-    const needed = LH_TIGHT + (wrapped.length - 1) * LH_BODY + 6
-    const ensured = await ensureSpaceOrNewPage(pdf, page, y, needed, fonts, {
-      onNewPage: async (np) => drawSectionHeader(np, "Critères", MARGIN, PAGE_HEIGHT - MARGIN, fontBold),
-    })
-    page = ensured.page
-    y = ensured.y
-    y = drawInlineRow(page, x, y, label, value, fonts, colWidth, LABEL_WIDTH_MAIN)
+  const ctx1: DocContext = {
+    pdf,
+    page: page1,
+    y: y1,
+    fonts: { reg: fontReg, bold: fontBold },
   }
 
-  // "INFORMATIONS COMPLÉMENTAIRES" section for long texts
+  // Locataires box
+  await drawLocatairesBox(ctx1, data.locataires || [])
+
+  // Sections communes sur la page 1 (après les locataires)
+  await ensureSpace(ctx1, 24) // Augmenté de 20 à 24
+  ctx1.page.drawLine({
+    start: { x: MARGIN, y: ctx1.y },
+    end: { x: PAGE_WIDTH - MARGIN, y: ctx1.y },
+    thickness: 1,
+    color: SEP_GRAY,
+  })
+  ctx1.y -= 16 // Augmenté de 12 à 16
+
+  // "CRITÈRES DU BIEN" section
+  await ensureSpace(ctx1, 40) // Augmenté de 32 à 40 pour plus d'espace
+  ctx1.y = drawSectionHeader(ctx1.page, "Critères du bien", MARGIN, ctx1.y, ctx1.fonts.bold)
+  
+  const totalWidth = PAGE_WIDTH - 2 * MARGIN
+  const xLabel = MARGIN
+  const xValue = MARGIN + LABEL_WIDTH + VALUE_INDENT
+  const valueWidth = totalWidth - LABEL_WIDTH - VALUE_INDENT
+
+  for (const row of getCriteriaRows(data.criteresRecherche)) {
+    const prep = prepareRowParts(row, fontReg, valueWidth)
+    await ensureSpace(ctx1, prep.totalHeight + 4) // Augmenté de 2 à 4 pour plus d'espace entre lignes
+    drawLabeledRowFromPrepared(ctx1, row, prep, xLabel, xValue)
+  }
+
+  // "PROJET DE DÉMÉNAGEMENT" section
+  await ensureSpace(ctx1, 40) // Augmenté de 32 à 40 pour plus d'espace
+  ctx1.y = drawSectionHeader(ctx1.page, "Projet de déménagement", MARGIN, ctx1.y, ctx1.fonts.bold)
+  
+  for (const row of getDemenagementRows(data.criteresRecherche)) {
+    const prep = prepareRowParts(row, fontReg, valueWidth)
+    await ensureSpace(ctx1, prep.totalHeight + 4) // Augmenté de 2 à 4 pour plus d'espace entre lignes
+    drawLabeledRowFromPrepared(ctx1, row, prep, xLabel, xValue)
+  }
+
+  // "INFORMATIONS COMPLÉMENTAIRES" section
   const long1 = showOrDash(data.criteresRecherche?.raisonDemenagement)
   const long2 = showOrDash(data.criteresRecherche?.informationsComplementaires)
 
-  y = drawSectionHeader(page, "Informations complémentaires", MARGIN, y, fontBold)
+  if (long1 !== dash || long2 !== dash) {
+    await ensureSpace(ctx1, 32) // Augmenté de 28 à 32
+    ctx1.y = drawSectionHeader(ctx1.page, "Informations complémentaires", MARGIN, ctx1.y, ctx1.fonts.bold)
 
-  // Raison du déménagement
-  {
-    const maxW = colWidth - LABEL_WIDTH_MAIN - VALUE_INDENT
-    const wrapped = wrapByWidth(long1, fontReg, BODY_SIZE, maxW)
-    const approxNeeded = LH_TIGHT + Math.min(wrapped.length - 1, 4) * LH_BODY + 6
-    const ensured = await ensureSpaceOrNewPage(pdf, page, y, approxNeeded, fonts, {
-      onNewPage: async (np) =>
-        drawSectionHeader(np, "Informations complémentaires", MARGIN, PAGE_HEIGHT - MARGIN, fontBold),
-    })
-    page = ensured.page
-    y = ensured.y
-    const res = await drawLongTextField({
-      pdf,
-      page,
-      y,
-      label: "Raison du déménagement",
-      value: long1,
-      fonts,
-      x,
-      colWidth,
-      labelWidth: LABEL_WIDTH_MAIN,
-      sectionTitleForContinuation: "Informations complémentaires",
-    })
-    page = res.page
-    y = res.y
+    // Raison du déménagement
+    if (long1 !== dash) {
+      const wrapped = wrapByWidth(long1, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 16)
+      const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      for (const l of wrapped) {
+        await ensureSpace(ctx1, lh)
+        ctx1.page.drawText(pdfSafe(`• Raison du déménagement : ${l}`), {
+          x: MARGIN + 16,
+          y: ctx1.y,
+          size: BODY_SIZE,
+          font: fontReg,
+          color: BLACK,
+        })
+        ctx1.y -= lh
+      }
+    }
+
+    // Informations complémentaires
+    if (long2 !== dash) {
+      const wrapped = wrapByWidth(long2, fontReg, BODY_SIZE, PAGE_WIDTH - 2 * MARGIN - 16)
+      const lh = wrapped.length >= 3 ? LONG_LINE_HEIGHT : LINE_HEIGHT
+      for (const l of wrapped) {
+        await ensureSpace(ctx1, lh)
+        ctx1.page.drawText(pdfSafe(`• ${l}`), {
+          x: MARGIN + 16,
+          y: ctx1.y,
+          size: BODY_SIZE,
+          font: fontReg,
+          color: BLACK,
+        })
+        ctx1.y -= lh
+      }
+    }
   }
 
-  // Informations complémentaires
-  {
-    const maxW = colWidth - LABEL_WIDTH_MAIN - VALUE_INDENT
-    const wrapped = wrapByWidth(long2, fontReg, BODY_SIZE, maxW)
-    const approxNeeded = LH_TIGHT + Math.min(wrapped.length - 1, 4) * LH_BODY + 6
-    const ensured = await ensureSpaceOrNewPage(pdf, page, y, approxNeeded, fonts, {
-      onNewPage: async (np) =>
-        drawSectionHeader(np, "Informations complémentaires", MARGIN, PAGE_HEIGHT - MARGIN, fontBold),
-    })
-    page = ensured.page
-    y = ensured.y
-    const res = await drawLongTextField({
-      pdf,
-      page,
-      y,
-      label: "Informations complémentaires",
-      value: long2,
-      fonts,
-      x,
-      colWidth,
-      labelWidth: LABEL_WIDTH_MAIN,
-      sectionTitleForContinuation: "Informations complémentaires",
-    })
-    page = res.page
-    y = res.y
-  }
+  // Footer sur la page 1
+  drawFooter(ctx1.page, fontReg)
 
   const bytes = await pdf.save()
   return Buffer.from(bytes)
@@ -568,10 +409,19 @@ export function hasRechercheData(data: AppFormData) {
   return Boolean(
     (c.secteurSouhaite && c.secteurSouhaite.trim()) ||
       (c.nombreChambres && c.nombreChambres.trim()) ||
+      (c.loyerMax && c.loyerMax.trim()) ||
       (c.rayonKm && c.rayonKm.trim()) ||
       (c.dateEmmenagement && c.dateEmmenagement.trim()) ||
       (c.preavisADeposer && c.preavisADeposer.trim()) ||
       (c.raisonDemenagement && c.raisonDemenagement.trim()) ||
       (c.informationsComplementaires && c.informationsComplementaires.trim()),
   )
+}
+
+export function buildRecherchePdfFilename(data: AppFormData): string {
+  const firstLoc = data.locataires?.[0]
+  const nom = firstLoc?.nom || "locataire"
+  const prenom = firstLoc?.prenom || ""
+  const base = [prenom, nom].filter(Boolean).join("-").toLowerCase()
+  return `criteres-recherche-${base}.pdf`
 }
