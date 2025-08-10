@@ -1,30 +1,77 @@
-# FormulaireALV
+# 🏠 ALV-FORMULAIRES - Plateforme de Formulaires Immobiliers
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+Une application web moderne et intuitive pour la gestion des formulaires immobiliers, développée avec Next.js 15 et TypeScript.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/foveau16-4049s-projects/v0-formulaire-alv-q1)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/Mjh0VMOBuy7)
+## ✨ Fonctionnalités
 
-## Overview
+- **Formulaires spécialisés** : Locataire, Garant, Vendeur, Propriétaire, Acquéreur
+- **Interface moderne** : Design responsive avec Tailwind CSS et composants UI avancés
+- **Génération PDF** : Export automatique des formulaires en PDF
+- **Validation en temps réel** : Vérification des données saisies
+- **Multi-étapes** : Navigation intuitive entre les sections
+- **Sauvegarde automatique** : Préservation des données saisies
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+## 🚀 Déploiement
 
-## Deployment
+### Vercel (Recommandé)
+1. Connectez-vous sur [vercel.com](https://vercel.com)
+2. Importez votre repository GitHub
+3. Déployez automatiquement
 
-Your project is live at:
+### GitHub Pages
+1. Activez GitHub Pages dans les paramètres du repository
+2. Configurez la source sur la branche `main`
+3. Déployez avec `npm run export`
 
-**[https://vercel.com/foveau16-4049s-projects/v0-formulaire-alv-q1](https://vercel.com/foveau16-4049s-projects/v0-formulaire-alv-q1)**
+## 🛠️ Technologies
 
-## Build your app
+- **Frontend** : Next.js 15, React 18, TypeScript
+- **Styling** : Tailwind CSS, CSS Modules
+- **UI Components** : Radix UI, Lucide Icons
+- **PDF** : PDFKit, jsPDF
+- **Validation** : Zod, React Hook Form
+- **Deployment** : Vercel, GitHub Actions
 
-Continue building your app on:
+## 📱 Compatibilité
 
-**[https://v0.dev/chat/projects/Mjh0VMOBuy7](https://v0.dev/chat/projects/Mjh0VMOBuy7)**
+- ✅ Desktop (Chrome, Firefox, Safari, Edge)
+- ✅ Mobile (iOS Safari, Chrome Mobile)
+- ✅ Tablette (iPad, Android)
 
-## How It Works
+## 🔧 Installation Locale
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+```bash
+# Cloner le repository
+git clone https://github.com/mf338898/ALV-FORMULAIRES.git
+cd ALV-FORMULAIRES
+
+# Installer les dépendances
+npm install
+
+# Lancer en développement
+npm run dev
+
+# Construire pour la production
+npm run build
+```
+
+## 📄 Structure des Formulaires
+
+- **Locataire** : Informations personnelles, professionnelles, critères de recherche
+- **Garant** : Données du garant, cautionnement
+- **Vendeur** : Détails de vente, bien immobilier
+- **Propriétaire** : Informations propriétaire, gestion locative
+- **Acquéreur** : Profil acheteur, financement
+
+## 🌐 URL de Déploiement
+
+- **Production** : [https://alv-formulaires.vercel.app](https://alv-formulaires.vercel.app)
+- **Développement** : [http://localhost:3000](http://localhost:3000)
+
+## 📞 Support
+
+Pour toute question ou assistance, contactez l'équipe de développement.
+
+---
+
+**Développé avec ❤️ par l'équipe ALV-FORMULAIRES**
