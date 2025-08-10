@@ -1,0 +1,168 @@
+"use client"
+
+import type React from "react"
+import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+export type SegmentedStep = {
+  key: string
+  label: string
+  index: number // 1-based
+}
+
+type SegmentedProgressProps = {
+  steps: SegmentedStep[]
+  currentStep: number // 1-based
+  maxReachedStep: number // gate for navigation
+  title?: string
+  onSelect?: (stepIndex: number) => void
+  className?: string
+}
+
+export function CircularStepIndicator({
+  current,
+  total,
+  size = 36,
+  trackColor = "rgb(226,232,240)", // slate-200
+  progressColor = "rgb(37,99,235)", // blue-600
+}: {
+  current: number
+  total: number
+  size?: number
+  trackColor?: string
+  progressColor?: string
+}) {
+  const pct = Math.max(0, Math.min(1, current / total))
+  const angle = Math.round(360 * pct)
+  const ringStyle: React.CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "9999px",
+    backgroundImage: `conic-gradient(${progressColor} ${angle}deg, ${trackColor} 0deg)`,
+  }
+  const innerSize = Math.max(0, size - 8)
+  return (
+    <div aria-hidden="true" className="relative grid place-items-center" style={ringStyle}>
+      <div
+        className="bg-white rounded-full flex items-center justify-center text-[11px] font-semibold text-slate-700 tabular-nums"
+        style={{ width: innerSize, height: innerSize }}
+      >
+        {current}/{total}
+      </div>
+    </div>
+  )
+}
+
+export function SegmentedProgress({
+  steps,
+  currentStep,
+  maxReachedStep,
+  title,
+  onSelect,
+  className,
+}: SegmentedProgressProps) {
+  const total = steps.length
+
+  return (
+    <div className={cn("w-full", className)}>
+      <TooltipProvider delayDuration={100}>
+        {/* Numbers row (desktop/tablet) with tooltips */}
+        <div
+          className="hidden md:grid mb-1 text-[11px]"
+          style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
+          aria-hidden="true"
+        >
+          {steps.map((s, idx) => {
+            const disabled = s.index > maxReachedStep
+            const completed = s.index < currentStep
+            const current = s.index === currentStep
+            return (
+              <div key={s.key} className="flex items-center justify-center select-none">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "px-1.5 py-0.5 rounded transition-colors tabular-nums tracking-tight",
+                        current && "text-blue-800 font-bold",
+                        completed && "text-emerald-700 font-semibold",
+                        disabled && "text-slate-400",
+                        !current && !completed && !disabled && "text-slate-600",
+                      )}
+                    >
+                      {idx + 1}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">
+                    <p className="font-medium">{s.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Segmented bar */}
+        <div className="relative">
+          <div
+            className="grid gap-[2px] rounded-md overflow-hidden"
+            style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
+            role="group"
+            aria-label="Progression par étapes"
+          >
+            {steps.map((s) => {
+              const disabled = s.index > maxReachedStep
+              const completed = s.index < currentStep
+              const current = s.index === currentStep
+
+              const segmentBtn = (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return
+                    onSelect?.(s.index)
+                  }}
+                  aria-label={`Étape ${s.index}: ${s.label}${disabled ? " (verrouillée)" : ""}`}
+                  aria-current={current ? "step" : undefined}
+                  className={cn(
+                    "relative h-3 transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500",
+                    completed && "bg-emerald-500 hover:bg-emerald-600",
+                    current && "bg-blue-700",
+                    !completed && !current && "bg-slate-200 hover:bg-slate-300",
+                    disabled && "cursor-not-allowed hover:cursor-not-allowed",
+                  )}
+                />
+              )
+
+              return (
+                <div key={s.key} className="w-full">
+                  <Tooltip>
+                    <TooltipTrigger asChild>{segmentBtn}</TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      <p className="font-medium">{s.label}</p>
+                      {disabled ? <p className="text-slate-500">Étape verrouillée</p> : null}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Centered title overlay */}
+          {title ? (
+            <div className="pointer-events-none absolute inset-0 hidden md:flex items-center justify-center">
+              <span className="px-2 py-0.5 text-[12px] font-medium text-slate-700 bg-white/80 backdrop-blur rounded">
+                {title} • Étape {currentStep} sur {total}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </TooltipProvider>
+
+      {/* A11y live region for screen readers */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {`Étape ${currentStep} sur ${total}${title ? `: ${title}` : ""}`}
+      </p>
+    </div>
+  )
+}
